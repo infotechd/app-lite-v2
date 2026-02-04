@@ -30,7 +30,7 @@ describe('Cadastro de Usuário - Envio de Email', () => {
     password: 'password123',
     tipo: 'comprador',
     tipoPessoa: 'PF',
-    cpf: '12345678902'
+    cpf: '123.456.789-09'
   };
 
   it('deve chamar o emailService.sendWelcomeEmail ao registrar um novo usuário', async () => {

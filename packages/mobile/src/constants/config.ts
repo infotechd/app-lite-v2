@@ -3,17 +3,17 @@ import * as Updates from 'expo-updates';
 // Configurações de ambiente
 const ENV = {
     dev: {
-        apiUrl: 'http://192.168.15.12:4000/api',
+        apiUrl: 'http://192.168.15.12:4000/api/',
         amplitudeApiKey: null,
         debug: true,
     },
     staging: {
-        apiUrl: 'https://staging-api.superapp.com/api',
+        apiUrl: 'https://staging-api.superapp.com/api/',
         amplitudeApiKey: 'your-staging-key',
         debug: false,
     },
     prod: {
-        apiUrl: 'https://api.app-super.digital/api',
+        apiUrl: 'https://api.app-super.digital/api/',
         amplitudeApiKey: 'your-prod-key',
         debug: false,
     },

@@ -22,6 +22,11 @@ import { logger } from '../utils/logger'; // Logger centralizado da aplicação
 // Configurar Cloudinary com variáveis de ambiente
 // Possível melhoria: validar se as variáveis existem e lançar erro amigável em caso de ausência.
 // Ex.: se alguma variável estiver faltando, logar e encerrar a inicialização do serviço.
+
+if (!process.env.CLOUDINARY_API_KEY) {
+    logger.error('ERRO DE CONFIGURAÇÃO: CLOUDINARY_API_KEY não definida no ambiente. Verifique o arquivo .env ou a ordem dos imports.');
+}
+
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
