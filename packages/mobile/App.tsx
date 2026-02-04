@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import RootNavigator from './src/navigation/RootNavigator';
 import { GlobalDialog } from './src/components/common/GlobalDialog';
 import { AuthProvider } from '@/context/AuthContext';
@@ -21,16 +22,18 @@ const App: React.FC = () => {
         initSentry();
     }, []);
     return (
-        <PaperProvider theme={paperTheme}>
-            <SafeAreaProvider>
-                <AuthProvider>
-                    <NavigationContainer theme={navigationTheme} ref={navigationRef}>
-                        <RootNavigator />
-                    </NavigationContainer>
-                    <GlobalDialog />
-                </AuthProvider>
-            </SafeAreaProvider>
-        </PaperProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <PaperProvider theme={paperTheme}>
+                <SafeAreaProvider>
+                    <AuthProvider>
+                        <NavigationContainer theme={navigationTheme} ref={navigationRef}>
+                            <RootNavigator />
+                        </NavigationContainer>
+                        <GlobalDialog />
+                    </AuthProvider>
+                </SafeAreaProvider>
+            </PaperProvider>
+        </GestureHandlerRootView>
     );
 };
 

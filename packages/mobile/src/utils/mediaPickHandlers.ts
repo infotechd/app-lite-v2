@@ -52,7 +52,7 @@ export async function handleMediaPickResult<TFile = any>(
             'Cancelar'
         );
         if (openSettings) {
-            Linking.openSettings();
+            await Linking.openSettings();
         }
         return;
     }

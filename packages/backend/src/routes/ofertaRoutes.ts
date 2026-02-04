@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { RequestHandler } from 'express';
 import { validate } from '../middleware/validation';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth';
 import { ofertaController } from '../controllers/ofertaController';
 import { ofertaFiltersSchema, createOfertaSchema, updateOfertaSchema } from '../validation/ofertaValidation';
 import rateLimit from 'express-rate-limit';
@@ -21,7 +21,9 @@ const ofertasRateLimitMw: RequestHandler = (req, res, next) => {
 };
 
 // Públicas
-router.get('/', ofertasRateLimitMw, validate(ofertaFiltersSchema), ofertaController.getOfertas);
+router.get('/', ofertasRateLimitMw, optionalAuthMiddleware, validate(ofertaFiltersSchema), (async (req, res) => {
+    await ofertaController.getOfertas(req, res);
+}) as RequestHandler);
 
 // Protegidas
 router.get('/minhas', authMiddleware, ofertaController.getMinhasOfertas);

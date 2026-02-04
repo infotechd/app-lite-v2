@@ -40,6 +40,8 @@ type ColorTokens = {
     secondary: string;
     background: string;
     surface: string;
+    onSurface: string;
+    onSurfaceVariant: string;
     text: string;
     textSecondary: string;
     border: string;
@@ -55,6 +57,8 @@ const lightTokens: ColorTokens = {
     secondary: '#03DAC6',
     background: '#F5F5F5',
     surface: '#FFFFFF',
+    onSurface: '#000000',
+    onSurfaceVariant: '#49454F',
     text: '#000000',
     textSecondary: '#B0B0B0',
     border: '#E0E0E0',

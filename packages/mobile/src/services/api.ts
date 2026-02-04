@@ -31,16 +31,16 @@ const IS_DEVELOPMENT = typeof __DEV__ !== 'undefined' && __DEV__ === true;
  * Em produção, a URL deve permanecer fixa (domínio público do backend).
  */
 const DEV_CANDIDATE_URLS: string[] = [
-    'http://192.168.1.54:4000/api', // Rede Mercúrio
-    'http://192.168.1.12:4000/api',  // Trabalho — IP do seu trabalho
-    'http://192.168.1.8:4000/api',   // Ip do Trabalho
-    'http://192.168.1.4:4000/api',   // Trabalho - Márcio
-    'http://192.168.1.3:4000/api',   // IP adicional solicitado
-    'http://192.168.15.12:4000/api', // Casa — faixa alternativa 192.168.15.x
-    'http://192.168.15.1:4000/api',  // Casa — gateway/roteador comum
-    'http://10.0.2.2:4000/api',      // Emulador Android (host do PC)
-    'http://127.0.0.1:4000/api',     // iOS Simulator (host local)
-    'http://localhost:4000/api'
+    'http://192.168.1.54:4000/api/', // Rede Mercúrio
+    'http://192.168.1.12:4000/api/',  // Trabalho — IP do seu trabalho
+    'http://192.168.1.8:4000/api/',   // Ip do Trabalho
+    'http://192.168.1.4:4000/api/',   // Trabalho - Márcio
+    'http://192.168.1.3:4000/api/',   // IP adicional solicitado
+    'http://192.168.15.12:4000/api/', // Casa — faixa alternativa 192.168.15.x
+    'http://192.168.15.1:4000/api/',  // Casa — gateway/roteador comum
+    'http://10.0.2.2:4000/api/',      // Emulador Android (host do PC)
+    'http://127.0.0.1:4000/api/',     // iOS Simulator (host local)
+    'http://localhost:4000/api/'
 ];
 
 // Endpoint leve já existente no backend para checagem de saúde (health-check).
@@ -91,10 +91,11 @@ async function pickReachableBaseURL(): Promise<string> {
 
     // 2) Tenta as candidatas em ordem
     for (const base of DEV_CANDIDATE_URLS) {
-        const ok = await ping(`${base}${HEALTH_PATH}`);
+        const ok = await ping(`${base.endsWith('/') ? base : base + '/'}${HEALTH_PATH.startsWith('/') ? HEALTH_PATH.slice(1) : HEALTH_PATH}`);
         if (ok) {
-            await AsyncStorage.setItem(CACHE_KEY, base);
-            return base;
+            const finalBase = base.endsWith('/') ? base : `${base}/`;
+            await AsyncStorage.setItem(CACHE_KEY, finalBase);
+            return finalBase;
         }
     }
 
@@ -190,14 +191,20 @@ api.interceptors.request.use(async (config) => {
     // Anexa o header Authorization
     if (currentToken) {
         const authValue = `Bearer ${currentToken}`;
-        if (config.headers && typeof (config.headers as any).set === 'function') {
-            (config.headers as any).set('Authorization', authValue);
-        } else {
-            config.headers = {
-                ...(config.headers as Record<string, string> | undefined),
-                Authorization: authValue,
-            } as any;
+        if (config.headers) {
+            if (typeof (config.headers as any).set === 'function') {
+                (config.headers as any).set('Authorization', authValue);
+            } else {
+                (config.headers as any).Authorization = authValue;
+            }
         }
+    }
+
+    // Log da URL completa em desenvolvimento para facilitar diagnóstico de 404/401
+    if (IS_DEVELOPMENT) {
+        const fullURL = `${config.baseURL || ''}${config.url || ''}`;
+        const finalAuthHeader = (config.headers as any)?.Authorization || (api.defaults.headers as any)?.common?.Authorization || (api.defaults.headers as any)?.Authorization;
+        console.log(`[API Request] ${config.method?.toUpperCase()} ${fullURL} - Auth: ${finalAuthHeader ? 'Present' : 'Absent'}`);
     }
     return config;
 });
@@ -229,6 +236,7 @@ api.interceptors.response.use(
         } catch {}
         
         if (error.response?.status === 401) {
+            console.warn('[API] 401 Unauthorized detectado - Limpando sessão. Detalhes:', error.response?.data);
             clearAuthToken();
             await AsyncStorage.removeItem('token');
             await AsyncStorage.removeItem('user');
@@ -249,8 +257,9 @@ if (IS_DEVELOPMENT && !IS_TEST) {
         try {
             const base = await pickReachableBaseURL();
             if (base && base !== api.defaults.baseURL) {
-                api.defaults.baseURL = base;
-                console.log(`[API] baseURL detectada: ${base}`);
+                const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+                api.defaults.baseURL = normalizedBase;
+                console.log(`[API] baseURL detectada: ${normalizedBase}`);
             }
         } catch {
             // Mantém base inicial se falhar a autodetecção

@@ -116,6 +116,19 @@ const BuscarOfertasScreen: React.FC = () => {
     const canCreateOffer = true;
     const navigation = useNavigation<NativeStackNavigationProp<OfertasStackParamList>>();
     const hasInitialLoadedRef = useRef(false);
+
+    useEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <IconButton
+                    icon="cards-outline"
+                    onPress={() => navigation.navigate('SwipeOfertas')}
+                    accessibilityLabel="Mudar para Swipe"
+                />
+            ),
+        });
+    }, [navigation]);
+
     // Robustness: track latest request to avoid stale updates overriding newer ones
     const requestIdRef = useRef(0);
     // Cancelamento: manter referência do AbortController da última requisição
