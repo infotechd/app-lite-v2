@@ -49,6 +49,8 @@ export type MainTabParamList = {
  * Define os parâmetros das rotas para a pilha de navegação de Ofertas.
  */
 export type OfertasStackParamList = {
+    /** Tela para exibir ofertas em um formato de swipe (deslizamento) */
+    SwipeOfertas: undefined;
     /** Tela principal de busca e filtragem de ofertas */
     BuscarOfertas: undefined;
     /** 

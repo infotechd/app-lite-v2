@@ -1,54 +1,83 @@
+/**
+ * Configuração e inicialização da aplicação Express.
+ * Este arquivo define os middlewares globais, configurações de segurança,
+ * tratamento de CORS, rotas da API e middlewares de tratamento de erro.
+ */
+
 import express, { Request, Response, NextFunction } from 'express';
+import config from './config';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import routes from './routes';
-import config from './config';
 import { requestLogger, loggerUtils } from './utils/logger';
 
-// Cria e configura a aplicação Express
+/**
+ * Instância da aplicação Express.
+ */
 const app: express.Application = express();
 
-// Segurança básica
+/**
+ * Configurações de Segurança.
+ * - Desabilita o cabeçalho 'x-powered-by' para dificultar a identificação da tecnologia.
+ * - Helmet adiciona diversos cabeçalhos de segurança (HSTS, CSP, etc).
+ */
 app.disable('x-powered-by');
 app.use(helmet());
 
-// CORS com lista de origens permitidas (ou todos com "*")
+/**
+ * Configuração de CORS (Cross-Origin Resource Sharing).
+ * Define quais origens podem acessar os recursos da API.
+ */
 app.use(
     cors({
         origin: (origin, callback) => {
-            // Em desenvolvimento, permitir todas as origens
+            // Em ambiente de desenvolvimento, todas as origens são permitidas para facilitar testes.
             if (config.NODE_ENV === 'development') {
                 return callback(null, true);
             }
             
-            // Permite ferramentas locais (sem origin) e wildcard
+            // Permite requisições sem 'origin' (ex: ferramentas locais) ou se o wildcard '*' estiver configurado.
             if (!origin || config.CORS_ORIGIN === '*') {
                 return callback(null, true);
             }
             
+            // Verifica se a origem da requisição está na lista branca definida nas configurações.
             if (config.CORS_ALLOWED_ORIGINS_SET.has(origin)) {
                 return callback(null, true);
             }
             
-            // Em produção, bloquear origens não permitidas
+            // Bloqueia o acesso para origens não autorizadas em produção.
             return callback(new Error('Origin not allowed by CORS'));
         },
-        credentials: true,
+        credentials: true, // Permite o envio de cookies e cabeçalhos de autorização
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     })
 );
 
-// Compressão e parsers
+/**
+ * Middlewares de utilidade.
+ * - compression: Compacta as respostas HTTP para economizar largura de banda.
+ * - json: Faz o parse de corpos de requisição em formato JSON (limite de 10mb).
+ * - urlencoded: Faz o parse de corpos em formato x-www-form-urlencoded.
+ */
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logger de requisições
+/**
+ * Middleware de Logging.
+ * Registra informações detalhadas de cada requisição recebida no console/logs.
+ */
 app.use(requestLogger as any);
 
-// Rota inicial informativa
+/**
+ * Rota de Health Check / Boas-vindas.
+ * Permite verificar rapidamente se o serviço está no ar.
+ * 
+ * @route GET /
+ */
 app.get('/', (_req: Request, res: Response) => {
     res.status(200).json({
         success: true,
@@ -60,10 +89,16 @@ app.get('/', (_req: Request, res: Response) => {
     });
 });
 
-// Rotas da API
+/**
+ * Registro das Rotas da API.
+ * Todas as rotas funcionais são prefixadas com '/api'.
+ */
 app.use('/api', routes);
 
-// 404 handler
+/**
+ * Middleware de Tratamento de Rotas Não Encontradas (404).
+ * Captura qualquer requisição que não coincida com as rotas definidas anteriormente.
+ */
 app.use((req: Request, res: Response) => {
     res.status(404).json({
         success: false,
@@ -72,10 +107,18 @@ app.use((req: Request, res: Response) => {
     });
 });
 
-// Error handler
+/**
+ * Middleware Global de Tratamento de Erros.
+ * Captura exceções lançadas em qualquer ponto da aplicação.
+ * 
+ * @param {any} err - O objeto de erro capturado.
+ * @param {Request} req - Objeto de requisição Express.
+ * @param {Response} res - Objeto de resposta Express.
+ * @param {NextFunction} _next - Função para passar o controle ao próximo middleware.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-    // Log estruturado do erro com contexto mínimo (sem PII)
+    // Log estruturado do erro para monitoramento e debug, filtrando dados sensíveis.
     loggerUtils.logError(err, {
         path: req.path,
         method: req.method,
@@ -83,10 +126,14 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
         params: req.params,
         query: req.query,
     });
+
+    // Determina o status code (padrão 500 para erros desconhecidos).
     const status = typeof err?.status === 'number' ? err.status : 500;
+
     res.status(status).json({
         success: false,
         message: status === 500 ? 'Erro interno do servidor' : err?.message || 'Erro',
+        // Em caso de erro 500, ocultamos a mensagem detalhada por segurança.
         error: status === 500 ? undefined : err?.message,
     });
 });
