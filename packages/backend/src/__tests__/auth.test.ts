@@ -27,7 +27,7 @@ describe('Auth Controller - Avatar fields', () => {
     email: 'test@example.com',
     password: 'password123',
     tipoPessoa: 'PF',
-    cpf: '12345678901'
+    cpf: '123.456.789-09'
   };
 
   it('deve retornar os campos de avatar no login', async () => {

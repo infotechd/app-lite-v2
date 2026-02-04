@@ -13,17 +13,33 @@ import { colors } from '@/styles/theme';
 import CriarOfertaScreen from '@/screens/app/CriarOfertaScreen';
 import OfertaDetalheScreen from '@/screens/app/OfertaDetalheScreen';
 import RequireAuth from '@/navigation/guards/RequireAuth';
+import SwipeOfertasScreen from '@/screens/app/SwipeOfertasScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const OfertasStack = createNativeStackNavigator<OfertasStackParamList>();
 
+/**
+ * Componente de navegação em pilha para a funcionalidade de Ofertas.
+ * Este navegador lida com o fluxo de descoberta, busca, criação, detalhamento e edição de ofertas.
+ * Utiliza o Native Stack Navigator para transições de tela nativas.
+ * 
+ * @returns {JSX.Element} O navegador de pilha de ofertas configurado com suas respectivas telas e guardas de autenticação.
+ */
 const OfertasNavigator = () => (
-    <OfertasStack.Navigator>
+    <OfertasStack.Navigator initialRouteName="SwipeOfertas">
+        {/* Tela de descoberta de ofertas (estilo Tinder) - Acesso livre (sem exigir login) */}
+        <OfertasStack.Screen
+            name="SwipeOfertas"
+            component={SwipeOfertasScreen}
+            options={{ title: 'Descobrir Ofertas' }}
+        />
+        {/* Tela de busca de ofertas por filtros/texto */}
         <OfertasStack.Screen
             name="BuscarOfertas"
             component={BuscarOfertasScreen}
             options={{ title: 'Buscar Serviços' }}
         />
+        {/* Tela de criação de nova oferta - Requer Autenticação */}
         <OfertasStack.Screen
             name="CreateOferta"
             options={{ title: 'Criar Oferta' }}
@@ -33,11 +49,13 @@ const OfertasNavigator = () => (
                 </RequireAuth>
             )}
         />
+        {/* Tela de detalhes de uma oferta específica */}
         <OfertasStack.Screen
             name="OfferDetail"
             component={OfertaDetalheScreen}
             options={{ title: 'Detalhe da Oferta' }}
         />
+        {/* Tela de edição de oferta existente - Requer Autenticação e Carregamento Dinâmico */}
         <OfertasStack.Screen
             name="EditOferta"
             options={{ title: 'Editar Oferta' }}
@@ -50,14 +68,27 @@ const OfertasNavigator = () => (
     </OfertasStack.Navigator>
 );
 
+/**
+ * Navegador de abas inferior principal (Bottom Tab Navigator).
+ * Define a navegação de nível superior do aplicativo após o login,
+ * organizando as principais seções (Ofertas, Agenda, Chat, Comunidade e Perfil).
+ * 
+ * @component
+ * @returns {React.FC} Componente Funcional do React que renderiza o navegador de abas.
+ */
 const MainTabNavigator: React.FC = () => {
     return (
         <Tab.Navigator
             initialRouteName="Ofertas"
             screenOptions={({ route }) => ({
+                /**
+                 * Configuração dinâmica do ícone da aba.
+                 * Alterna entre ícones preenchidos e contornados baseando-se no estado de foco.
+                 */
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName: IconName;
 
+                    // Mapeamento de rotas para seus respectivos ícones do MaterialCommunityIcons
                     switch (route.name) {
                         case 'Ofertas':
                             iconName = focused ? 'store' : 'store-outline';
@@ -80,11 +111,13 @@ const MainTabNavigator: React.FC = () => {
 
                     return <Icon name={iconName} size={size} color={color} />;
                 },
+                // Cores do tema aplicadas aos ícones e labels das abas
                 tabBarActiveTintColor: colors.primary,
                 tabBarInactiveTintColor: colors.textSecondary,
-                headerShown: false,
+                headerShown: false, // Cabeçalho oculto por padrão nas abas, gerenciado individualmente nas pilhas
             })}
         >
+            {/* Definição das abas individuais */}
             <Tab.Screen name="Ofertas" component={OfertasNavigator} />
             <Tab.Screen name="Agenda" component={AgendaScreen} />
             <Tab.Screen name="Chat" component={ChatScreen} />

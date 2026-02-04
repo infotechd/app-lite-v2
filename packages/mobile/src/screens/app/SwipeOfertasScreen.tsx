@@ -1,0 +1,477 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { Text, Button, Snackbar, IconButton } from 'react-native-paper';
+import { Swiper, type SwiperCardRefType } from 'rn-swiper-list';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { OfertasStackParamList } from '@/types';
+import { OfertaServico } from '@/types/oferta';
+import { ofertaService } from '@/services/ofertaService';
+import { interactionService } from '@/services/interactionService';
+import OfferSwipeCard from '@/components/offers/OfferSwipeCard';
+import SwipeLikeOverlay from '@/components/offers/SwipeLikeOverlay';
+import SwipeNopeOverlay from '@/components/offers/SwipeNopeOverlay';
+import { useAuth } from '@/context/AuthContext';
+import { colors, spacing } from '@/styles/theme';
+
+// Tamanho de página padrão e margem para pré-carregar mais ofertas antes do fim do deck
+const PAGE_SIZE = 10;
+const PAGINATION_THRESHOLD = 3;
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+/**
+ * Tela principal de exibição de ofertas no formato de "swipe" (cartões deslizáveis).
+ * Permite ao usuário interagir com ofertas de serviços de forma dinâmica,
+ * curtindo (swipe right) ou descartando (swipe left).
+ * 
+ * @returns {React.JSX.Element} Renderiza a interface de cartões deslizáveis ou estados de erro/carregamento.
+ */
+const SwipeOfertasScreen: React.FC = () => {
+    // Estados para o gerenciamento das ofertas e fluxo de dados
+    const [ofertas, setOfertas] = useState<OfertaServico[]>([]);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [isPaging, setIsPaging] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [isEmpty, setIsEmpty] = useState(false);
+
+    const swiperRef = useRef<SwiperCardRefType>(null);
+    const paginationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const requestIdRef = useRef(0);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const { isAuthenticated } = useAuth();
+    const navigation = useNavigation<NativeStackNavigationProp<OfertasStackParamList>>();
+
+    // Configura as opções de navegação do cabeçalho com referência estável para evitar re-render desnecessário
+    const headerRight = useCallback(
+        () => (
+            <IconButton
+                icon="format-list-bulleted"
+                onPress={() => navigation.navigate('BuscarOfertas')}
+                accessibilityLabel="Mudar para lista"
+                accessibilityRole="button"
+            />
+        ),
+        [navigation]
+    );
+
+    useEffect(() => {
+        navigation.setOptions({ headerRight });
+    }, [headerRight, navigation]);
+
+    /**
+     * Limpa o debounce da paginação para evitar múltiplas chamadas concorrentes.
+     * Garante que apenas um agendamento de nova página permaneça ativo.
+     *
+     * @returns {void} Não retorna valor; apenas limpa o timeout ativo, se existir.
+     */
+    const clearPaginationDebounce = useCallback(() => {
+        if (paginationDebounceRef.current) {
+            clearTimeout(paginationDebounceRef.current);
+            paginationDebounceRef.current = null;
+        }
+    }, []);
+
+    /**
+     * Carrega as ofertas da API com suporte a paginação e cancelamento de chamadas concorrentes.
+     * Usa AbortController e um requestId incremental para descartar respostas antigas e prevenir race conditions.
+     * Define estados específicos de carregamento conforme a origem da chamada (inicial, paginação ou refresh).
+     *
+     * @param {number} [pageNum=1] Número da página solicitada.
+     * @param {boolean} [append=false] Se true, anexa resultados ao fim da lista; se false, substitui a lista.
+     * @param {'initial' | 'paginate' | 'refresh'} [origin='initial'] Origem lógica da chamada para marcar os loaders corretos.
+     * @returns {Promise<void>} Promessa resolvida ao término do fluxo de carregamento.
+     */
+    const lastRequestRef = useRef<{ page: number; append: boolean; origin: 'initial' | 'paginate' | 'refresh' }>({
+        page: 1,
+        append: false,
+        origin: 'initial',
+    });
+
+    const loadOfertas = useCallback(
+        async (pageNum = 1, append = false, origin: 'initial' | 'paginate' | 'refresh' = 'initial') => {
+            lastRequestRef.current = { page: pageNum, append, origin };
+             const requestId = ++requestIdRef.current;
+             abortControllerRef.current?.abort();
+             const controller = new AbortController();
+             abortControllerRef.current = controller;
+
+            setError(null);
+            if (origin === 'initial') setIsInitialLoading(true);
+            if (origin === 'paginate') setIsPaging(true);
+            if (origin === 'refresh') setIsRefreshing(true);
+
+            try {
+                // Chamada ao serviço de ofertas buscando 10 itens por vez
+                const response = await ofertaService.getOfertas({}, pageNum, PAGE_SIZE, controller.signal);
+                if (requestId !== requestIdRef.current) return;
+
+                const newOfertas = response.ofertas || [];
+                const totalPages = response.totalPages || Math.max(1, Math.ceil((response.total ?? 0) / PAGE_SIZE));
+                const currentPage = response.page || pageNum;
+                // Atualiza o estado de paginação baseado na resposta do servidor com fallback por total
+                setHasMore(currentPage < totalPages);
+                setPage(currentPage);
+                // Adiciona novos itens ao final da lista existente (infite scroll)
+                setOfertas((prev) => (append ? [...prev, ...newOfertas] : newOfertas));
+                // Define estado vazio apenas se for o carregamento inicial e não houver dados
+                setIsEmpty(!append && newOfertas.length === 0);
+            } catch (err: any) {
+                if (controller.signal.aborted) return;
+                const message = err?.message
+                    ? `Erro ao carregar ofertas: ${err.message}`
+                    : 'Erro ao carregar ofertas. Verifique sua conexão.';
+                setError(message);
+            } finally {
+                if (requestId === requestIdRef.current) {
+                    setIsInitialLoading(false);
+                    setIsPaging(false);
+                    setIsRefreshing(false);
+                }
+            }
+        },
+        []
+    );
+
+    // Efeito para carregar as ofertas iniciais quando o componente é montado
+    useEffect(() => {
+        void loadOfertas(1, false, 'initial');
+        return () => {
+            abortControllerRef.current?.abort();
+            clearPaginationDebounce();
+            requestIdRef.current += 1;
+        };
+    }, [clearPaginationDebounce, loadOfertas]);
+
+    /**
+     * Agenda a próxima página com debounce para evitar múltiplas requisições em swipes rápidos.
+     * Só dispara se ainda houver páginas e não houver uma paginação em curso.
+     *
+     * @returns {void} Não retorna valor; apenas agenda a execução assíncrona.
+     */
+    const scheduleNextPage = useCallback(() => {
+        if (!hasMore || isPaging) return;
+        clearPaginationDebounce();
+        paginationDebounceRef.current = setTimeout(() => {
+            setPage((prev) => {
+                const next = prev + 1;
+                void loadOfertas(next, true, 'paginate');
+                return next;
+            });
+        }, 300); // debounce curto para evitar chamadas duplicadas em sequência
+    }, [clearPaginationDebounce, hasMore, isPaging, loadOfertas]);
+
+    /**
+     * Manipula o swipe para a direita (Like), registra a interação e pré-carrega mais cartas ao se aproximar do fim.
+     *
+     * @param {number} index Índice do cartão deslizado.
+     * @returns {void} Não retorna valor; efeitos colaterais incluem chamadas de API e agendamento de paginação.
+     */
+    const handleSwipeRight = useCallback(
+        (index: number) => {
+            const oferta = ofertas[index];
+            if (!oferta) return;
+
+            // Se o usuário estiver autenticado, registra o Like; caso contrário, apenas passa o cartão
+            if (isAuthenticated) {
+                void interactionService.likeOffer(oferta._id).catch(console.error);
+            }
+
+            // Se o usuário estiver chegando ao fim da lista atual, carrega a próxima página
+            if (index >= ofertas.length - PAGINATION_THRESHOLD) {
+                scheduleNextPage();
+            }
+        },
+        [isAuthenticated, ofertas, scheduleNextPage]
+    );
+
+    /**
+     * Manipula o swipe para a esquerda (Dislike), registra a interação e pré-carrega mais cartas ao se aproximar do fim.
+     *
+     * @param {number} index Índice do cartão deslizado.
+     * @returns {void} Não retorna valor; efeitos colaterais incluem chamadas de API e agendamento de paginação.
+     */
+    const handleSwipeLeft = useCallback(
+        (index: number) => {
+            const oferta = ofertas[index];
+            if (!oferta) return;
+
+            // Se o usuário estiver autenticado, registra o Dislike; caso contrário, apenas passa o cartão
+            if (isAuthenticated) {
+                void interactionService.dislikeOffer(oferta._id).catch(console.error);
+            }
+
+            // Lógica de paginação antecipada (carrega mais antes de acabar todos os cartões)
+            if (index >= ofertas.length - PAGINATION_THRESHOLD) {
+                scheduleNextPage();
+            }
+        },
+        [isAuthenticated, ofertas, scheduleNextPage]
+    );
+
+    /**
+     * Acionado ao consumir todas as cartas atuais; tenta paginar se houver mais, senão sinaliza lista vazia.
+     *
+     * @returns {void} Não retorna valor; ajusta estado de vazio ou agenda nova página.
+     */
+    const handleSwipedAll = useCallback(() => {
+        if (hasMore) {
+            scheduleNextPage();
+        } else {
+            setIsEmpty(true);
+        }
+    }, [hasMore, scheduleNextPage]);
+
+    /**
+     * Desfaz o último swipe, devolvendo o cartão ao topo do deck.
+     *
+     * @returns {void} Não retorna valor; apenas chama a API do swiper.
+     */
+    const handleUndo = useCallback(() => {
+        if (!swiperRef.current || ofertas.length === 0) return;
+        swiperRef.current.swipeBack();
+    }, []);
+
+    /**
+     * Recarrega as ofertas do zero (pull-to-refresh) limpando estados de paginação e vazio.
+     *
+     * @returns {Promise<void>} Promessa resolvida após finalizar o refresh.
+     */
+    const handleRefresh = useCallback(async () => {
+        setPage(1);
+        setHasMore(true);
+        setIsEmpty(false);
+        clearPaginationDebounce();
+        await loadOfertas(1, false, 'refresh');
+    }, [clearPaginationDebounce, loadOfertas]);
+
+    /**
+     * Renderiza a carta de oferta mantendo referência estável para evitar re-render no Swiper.
+     *
+     * @param {OfertaServico} item Oferta a ser exibida na carta.
+     * @returns {React.JSX.Element} Componente de carta de oferta.
+     */
+    const renderCard = useCallback((item: OfertaServico) => <OfferSwipeCard item={item} />, []);
+    /**
+     * Renderiza o overlay de like com callback estável para o Swiper.
+     *
+     * @returns {React.JSX.Element} Componente de overlay de like.
+     */
+    const renderLikeOverlay = useCallback(() => <SwipeLikeOverlay />, []);
+    /**
+     * Renderiza o overlay de dislike com callback estável para o Swiper.
+     *
+     * @returns {React.JSX.Element} Componente de overlay de dislike.
+     */
+    const renderNopeOverlay = useCallback(() => <SwipeNopeOverlay />, []);
+
+    // Exibe indicador de carregamento centralizado enquanto busca dados iniciais
+    if (isInitialLoading && ofertas.length === 0) {
+        return (
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text variant="bodyLarge" style={styles.loadingText}>
+                    Carregando ofertas...
+                </Text>
+            </View>
+        );
+    }
+
+    // Renderiza uma mensagem informativa e botão de recarregar quando não há ofertas disponíveis
+    if (isEmpty) {
+        return (
+            <View style={styles.centerContainer}>
+                <Icon name="cards-outline" size={80} color={colors.onSurfaceVariant} accessibilityLabel="Sem ofertas" />
+                <Text variant="headlineSmall" style={styles.emptyTitle}>
+                    Sem mais ofertas
+                </Text>
+                <Text variant="bodyMedium" style={styles.emptyText}>
+                    Você já viu todas as ofertas disponíveis no momento.
+                </Text>
+                <Button
+                    mode="contained"
+                    onPress={handleRefresh}
+                    style={styles.refreshButton}
+                    loading={isRefreshing}
+                    accessibilityLabel="Atualizar ofertas"
+                    accessibilityRole="button"
+                >
+                    Atualizar
+                </Button>
+            </View>
+        );
+    }
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.swiperArea}>
+                <Swiper
+                    ref={swiperRef}
+                    data={ofertas}
+                    renderCard={renderCard}
+                    OverlayLabelRight={renderLikeOverlay}
+                    OverlayLabelLeft={renderNopeOverlay}
+                    onSwipeRight={handleSwipeRight}
+                    onSwipeLeft={handleSwipeLeft}
+                    onSwipedAll={handleSwipedAll}
+                    cardStyle={styles.cardContainer}
+                />
+            </View>
+
+            {/* Barra inferior de ações flutuando no rodapé */}
+            <View style={styles.actionsContainer}>
+                {/* Botão para descartar a oferta (Swipe Left) */}
+                <Button
+                    mode="outlined"
+                    onPress={() => swiperRef.current?.swipeLeft()}
+                    style={styles.actionButton}
+                    contentStyle={styles.actionButtonContent}
+                    accessibilityLabel="Descartar oferta"
+                    accessibilityRole="button"
+                >
+                    <Icon name="close" size={24} color={colors.error} />
+                </Button>
+
+                {/* Botão para desfazer o último movimento */}
+                <Button
+                    mode="outlined"
+                    onPress={handleUndo}
+                    style={styles.undoButton}
+                    contentStyle={styles.undoButtonContent}
+                    accessibilityLabel="Desfazer último swipe"
+                    accessibilityRole="button"
+                >
+                    <Icon name="undo" size={20} color={colors.onSurfaceVariant} />
+                </Button>
+
+                {/* Botão para curtir a oferta (Swipe Right) */}
+                <Button
+                    mode="outlined"
+                    onPress={() => swiperRef.current?.swipeRight()}
+                    style={styles.actionButton}
+                    contentStyle={styles.actionButtonContent}
+                    accessibilityLabel="Curtir oferta"
+                    accessibilityRole="button"
+                >
+                    <Icon name="heart" size={24} color={colors.success} />
+                </Button>
+            </View>
+
+            {isPaging && (
+                <View style={styles.pagingIndicator}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text variant="bodySmall" style={styles.loadingText}>
+                        Carregando mais ofertas...
+                    </Text>
+                </View>
+            )}
+
+            {/* Snackbar para exibição de erros persistentes com opção de retry */}
+            <Snackbar
+                visible={!!error}
+                onDismiss={() => setError(null)}
+                action={{
+                    label: 'Tentar novamente',
+                    onPress: () => {
+                        const { page: lastPage, append, origin } = lastRequestRef.current;
+                        void loadOfertas(lastPage, append, origin);
+                    },
+                }}
+            >
+                {error}
+            </Snackbar>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: colors.background,
+    },
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xl,
+        backgroundColor: colors.background,
+    },
+    loadingText: {
+        marginTop: spacing.md,
+        color: colors.onSurfaceVariant,
+    },
+    emptyTitle: {
+        marginTop: spacing.md,
+        color: colors.onSurface,
+        textAlign: 'center',
+    },
+    emptyText: {
+        marginTop: spacing.sm,
+        color: colors.onSurfaceVariant,
+        textAlign: 'center',
+    },
+    refreshButton: {
+        marginTop: spacing.lg,
+    },
+    cardContainer: {
+        width: SCREEN_WIDTH * 0.9,
+        alignSelf: 'center',
+        // Removido marginBottom e relying na centralização do swiperArea
+    },
+    actionsContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: spacing.lg,
+        paddingBottom: spacing.xl,
+        gap: spacing.md,
+        backgroundColor: 'transparent', // Transparente para não bloquear o fundo se o card for longo
+    },
+    actionButton: {
+        borderRadius: 50,
+        width: 64,
+        height: 64,
+        backgroundColor: colors.surface,
+        elevation: 2,
+    },
+    actionButtonContent: {
+        width: 64,
+        height: 64,
+    },
+    undoButton: {
+        borderRadius: 50,
+        width: 50,
+        height: 50,
+        backgroundColor: colors.surface,
+        elevation: 1,
+    },
+    undoButtonContent: {
+        width: 50,
+        height: 50,
+    },
+    swiperArea: {
+        flex: 1,
+        width: '100%',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        paddingTop: spacing.lg,
+    },
+    pagingIndicator: {
+        position: 'absolute',
+        bottom: spacing.xl + spacing.md,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+});
+
+export default SwipeOfertasScreen;

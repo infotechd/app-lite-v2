@@ -11,7 +11,21 @@ type SortOption = 'relevancia' | 'preco_menor' | 'preco_maior' | 'avaliacao' | '
 const ALLOWED_SORT_OPTIONS: SortOption[] = ['relevancia', 'preco_menor', 'preco_maior', 'avaliacao', 'recente', 'distancia'];
 // --- FIM DA CORREÇÃO 1 ---
 
+/**
+ * Controller responsável por gerenciar as operações relacionadas às ofertas de serviço.
+ * Fornece métodos para listagem, criação, atualização e remoção de ofertas.
+ */
 export const ofertaController = {
+    /**
+     * Lista as ofertas de serviço com base em filtros, paginação e ordenação.
+     * Suporta busca por texto, filtragem por preço, categoria, localização, etc.
+     * Implementa cache via ETag e Cache-Control para otimizar a performance.
+     * 
+     * @async
+     * @param {AuthRequest} req - Requisição Express contendo query params de filtro e dados do usuário.
+     * @param {Response} res - Resposta Express.
+     * @returns {Promise<void>}
+     */
     async getOfertas(req: AuthRequest, res: Response) {
         try {
             // 1. Ler a query de entrada. 'q.sort' aqui é (string | undefined)
@@ -44,35 +58,37 @@ export const ofertaController = {
                 cidade: q.cidade,
                 estado: q.estado,
                 busca: q.busca,
-                page: q.page ?? 1,
-                limit: q.limit ?? 10,
+                page: Number(q.page) || 1,
+                limit: Number(q.limit) || 10,
                 // 4. Passar o valor validado
                 sort: sortValue,
 
                 // Passando os outros filtros que estavam no seu frontend
-                comMidia: q.comMidia === true,
+                comMidia: q.comMidia === true || (q as any).comMidia === 'true',
                 tipoPessoa: q.tipoPessoa,
                 // Coordenadas opcionais para sort=distancia
-                lat: q.lat,
-                lng: q.lng,
+                lat: q.lat ? Number(q.lat) : undefined,
+                lng: q.lng ? Number(q.lng) : undefined,
+                userId: req.user?.id,
             };
             // --- FIM DA CORREÇÃO 2 ---
 
             // Agora 'filters' tem o tipo exato que 'ofertaService.list' espera
             const result = await ofertaService.list(filters);
 
-            // ETag fraca baseada na query + payload
+            // ETag fraca baseada na query + payload para evitar re-download de dados idênticos
             const etagPayload = JSON.stringify({ q: req.query, result });
             const etag = 'W/"' + crypto.createHash('sha1').update(etagPayload).digest('base64') + '"';
 
-            // Se o cliente enviou If-None-Match com o mesmo ETag, retornar 304
+            // Se o cliente enviou If-None-Match com o mesmo ETag, retornar 304 (Not Modified)
             const inm = req.headers['if-none-match'];
             if (inm && inm === etag) {
-                res.status(304).setHeader('ETag', etag);
-                return res.end();
+                res.setHeader('ETag', etag);
+                res.status(304).end();
+                return;
             }
 
-            // Cache curto e ETag para buscas repetidas
+            // Configura cabeçalhos de cache: Cache privado de 30s com revalidação em background
             res.setHeader('ETag', etag);
             res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=30');
 
@@ -88,6 +104,14 @@ export const ofertaController = {
         }
     },
 
+    /**
+     * Obtém os detalhes de uma única oferta pelo seu ID.
+     * 
+     * @async
+     * @param {AuthRequest} req - Requisição Express contendo o ID da oferta nos params.
+     * @param {Response} res - Resposta Express.
+     * @returns {Promise<void>}
+     */
     async getOfertaById(req: AuthRequest, res: Response) {
         try {
             const { id } = req.params as { id: string };
@@ -103,6 +127,15 @@ export const ofertaController = {
         }
     },
 
+    /**
+     * Cria uma nova oferta de serviço.
+     * Associa automaticamente a oferta ao usuário autenticado.
+     * 
+     * @async
+     * @param {AuthRequest} req - Requisição Express contendo os dados da nova oferta no body.
+     * @param {Response} res - Resposta Express.
+     * @returns {Promise<void>}
+     */
     async createOferta(req: AuthRequest, res: Response) {
         try {
             const user = req.user;
@@ -122,6 +155,15 @@ export const ofertaController = {
         }
     },
 
+    /**
+     * Atualiza os dados de uma oferta existente.
+     * Verifica se a oferta pertence ao usuário ou se ele tem permissão para editar.
+     * 
+     * @async
+     * @param {AuthRequest} req - Requisição Express contendo o ID nos params e os novos dados no body.
+     * @param {Response} res - Resposta Express.
+     * @returns {Promise<void>}
+     */
     async updateOferta(req: AuthRequest, res: Response) {
         try {
             const user = req.user;
@@ -145,6 +187,15 @@ export const ofertaController = {
         }
     },
 
+    /**
+     * Remove uma oferta de serviço.
+     * Exige que a oferta pertença ao usuário autenticado.
+     * 
+     * @async
+     * @param {AuthRequest} req - Requisição Express contendo o ID da oferta nos params.
+     * @param {Response} res - Resposta Express.
+     * @returns {Promise<void>}
+     */
     async deleteOferta(req: AuthRequest, res: Response) {
         try {
             const user = req.user;
@@ -167,6 +218,14 @@ export const ofertaController = {
         }
     },
 
+    /**
+     * Lista todas as ofertas criadas pelo usuário autenticado.
+     * 
+     * @async
+     * @param {AuthRequest} req - Requisição Express contendo os dados do usuário.
+     * @param {Response} res - Resposta Express.
+     * @returns {Promise<void>}
+     */
     async getMinhasOfertas(req: AuthRequest, res: Response) {
         try {
             const user = req.user;

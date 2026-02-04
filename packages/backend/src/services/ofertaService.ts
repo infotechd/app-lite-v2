@@ -2,6 +2,7 @@ import mongoose, { FilterQuery, PipelineStage } from 'mongoose';
 import { OfertaServico, IOfertaServico } from '../models/OfertaServico';
 import User from '../models/User';
 import { logger } from '../utils/logger';
+import { interactionService } from './interactionService';
 
 /**
  * Tipo para consultas de filtro baseadas no modelo IOfertaServico.
@@ -53,6 +54,7 @@ export interface ListFilters {
     lng?: number;
     page?: number;
     limit?: number;
+    userId?: string;
 }
 
 /**
@@ -80,10 +82,17 @@ export const ofertaService = {
         const {
             categoria, subcategoria, tipoPessoa, precoMin, precoMax, cidade, estado,
             busca, sort = 'relevancia', comMidia, lat, lng, page = 1, limit = 10,
+            userId,
         } = filters;
 
         // Inicializa a query filtrando apenas ofertas ativas
         const query: OfertaFilterQuery = { status: { $ne: 'inativo' } };
+        if (userId) {
+            const interactedIds = await interactionService.getInteractedOfferIds(userId);
+            if (interactedIds.length > 0) {
+                query._id = { $nin: interactedIds };
+            }
+        }
         const hasBusca = Boolean(busca && busca.trim().length > 0);
 
         // --- 1. Filtros Básicos ---
@@ -228,7 +237,7 @@ export const ofertaService = {
             OfertaServico.countDocuments(query),
         ]);
 
-        return { ofertas, total, page, totalPages: Math.ceil(total / limit) };
+        return { ofertas: ofertas as unknown as IOfertaServico[], total, page, totalPages: Math.ceil(total / limit) };
     },
 
     /**
@@ -252,7 +261,7 @@ export const ofertaService = {
             logger.warn('ofertas.getById.result', { id, found: false });
         }
         
-        return oferta;
+        return oferta as unknown as IOfertaServico | null;
     },
 
     /**
@@ -305,10 +314,10 @@ export const ofertaService = {
         }
 
         // Extrai o ID do prestador tratando possíveis variações de população do Mongoose
-        const prestadorId = (oferta.prestador as any)?._id?._id || (oferta.prestador as any)?._id;
+        const prestadorId = oferta.prestador?._id;
 
         // Verifica se o usuário autenticado é o mesmo que criou a oferta
-        if (String(prestadorId) !== String(userId)) {
+        if (prestadorId && String(prestadorId) !== String(userId)) {
             logger.warn('ofertas.update.forbidden', { id, userId, owner: String(prestadorId) });
             const err = new Error('Sem permissão para atualizar esta oferta') as Error & { status: number };
             err.status = 403;
@@ -338,10 +347,10 @@ export const ofertaService = {
             return false;
         }
 
-        const prestadorId = (oferta.prestador as any)?._id?._id || (oferta.prestador as any)?._id;
+        const prestadorId = oferta.prestador?._id;
 
         // Verifica permissão de propriedade
-        if (String(prestadorId) !== String(userId)) {
+        if (prestadorId && String(prestadorId) !== String(userId)) {
             logger.warn('ofertas.remove.forbidden', { id, userId, owner: String(prestadorId) });
             const err = new Error('Sem permissão para deletar esta oferta') as Error & { status: number };
             err.status = 403;
@@ -365,7 +374,7 @@ export const ofertaService = {
             .lean();
             
         logger.info('ofertas.listByUser.result', { userId, count: ofertas.length });
-        return ofertas;
+        return ofertas as unknown as IOfertaServico[];
     },
 };
 
