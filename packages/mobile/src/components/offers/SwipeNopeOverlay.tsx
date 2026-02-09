@@ -38,8 +38,8 @@ const SwipeNopeOverlay: React.FC<SwipeNopeOverlayProps> = ({
         accessibilityRole="image"
         accessibilityLabel="Indicação de que você não gostou da oferta"
     >
-        {/* Ícone de fechar em círculo para indicar visualmente a rejeição */}
-        <Icon name="close-circle" size={iconSize} color={colors.error} />
+        {/* Ícone de fechar para indicar visualmente a rejeição */}
+        <Icon name="close" size={iconSize} color={colors.error} />
         {/* Texto em destaque para confirmar a intenção de "NÃO" */}
         <Text variant="headlineLarge" style={styles.text}>{label}</Text>
     </View>
