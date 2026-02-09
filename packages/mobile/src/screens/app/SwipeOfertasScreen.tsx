@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, useWindowDimensions, Vibration } from 'react-native';
 import { Text, Button, Snackbar, IconButton } from 'react-native-paper';
 import { Swiper, type SwiperCardRefType } from 'rn-swiper-list';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { OfertasStackParamList } from '@/types';
 import { OfertaServico } from '@/types/oferta';
 import { ofertaService } from '@/services/ofertaService';
@@ -32,6 +33,7 @@ const SwipeOfertasScreen: React.FC = () => {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [isEmpty, setIsEmpty] = useState(false);
+    const [currentIndex, setCurrentIndex] = useState(0);
 
     const swiperRef = useRef<SwiperCardRefType>(null);
     const paginationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -40,6 +42,7 @@ const SwipeOfertasScreen: React.FC = () => {
     const { isAuthenticated } = useAuth();
     const navigation = useNavigation<NativeStackNavigationProp<OfertasStackParamList>>();
     const { width: windowWidth } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
     const fallbackWidth = Math.max(layout.cardWidthFallback, layout.minScreenWidth);
     const cardWidth = Math.max(windowWidth || fallbackWidth, layout.minScreenWidth) * layout.cardWidthRatio;
 
@@ -173,6 +176,10 @@ const SwipeOfertasScreen: React.FC = () => {
             const oferta = ofertas[index];
             if (!oferta) return;
 
+            // Feedback tátil
+            Vibration.vibrate(10);
+            setCurrentIndex(index + 1);
+
             // Se o usuário estiver autenticado, registra o Like; caso contrário, apenas passa o cartão
             if (isAuthenticated) {
                 void interactionService.likeOffer(oferta._id).catch((err) => {
@@ -198,6 +205,10 @@ const SwipeOfertasScreen: React.FC = () => {
         (index: number) => {
             const oferta = ofertas[index];
             if (!oferta) return;
+
+            // Feedback tátil
+            Vibration.vibrate(10);
+            setCurrentIndex(index + 1);
 
             // Se o usuário estiver autenticado, registra o Dislike; caso contrário, apenas passa o cartão
             if (isAuthenticated) {
@@ -236,9 +247,12 @@ const SwipeOfertasScreen: React.FC = () => {
         const swiper = swiperRef.current;
         if (!swiper || ofertas.length === 0) return;
         try {
-            const currentIndex = (swiper as any).currentIndex;
-            if (typeof currentIndex === 'number' && currentIndex <= 0) return;
+            const swiperCurrentIndex = (swiper as any).currentIndex;
+            if (typeof swiperCurrentIndex === 'number' && swiperCurrentIndex <= 0) return;
+            
             swiper.swipeBack();
+            Vibration.vibrate(10);
+            setCurrentIndex((prev) => Math.max(0, prev - 1));
         } catch (err) {
             if (__DEV__) console.error(err);
         }
@@ -253,6 +267,7 @@ const SwipeOfertasScreen: React.FC = () => {
         setPage(1);
         setHasMore(true);
         setIsEmpty(false);
+        setCurrentIndex(0);
         clearPaginationDebounce();
         await loadOfertas(1, false, 'refresh');
     }, [clearPaginationDebounce, loadOfertas]);
@@ -263,7 +278,12 @@ const SwipeOfertasScreen: React.FC = () => {
      * @param {OfertaServico} item Oferta a ser exibida na carta.
      * @returns {React.JSX.Element} Componente de carta de oferta.
      */
-    const renderCard = useCallback((item: OfertaServico) => <OfferSwipeCard item={item} />, []);
+    const renderCard = useCallback(
+        (item: OfertaServico) => (
+            <OfferSwipeCard item={item} onPress={(oferta) => navigation.navigate('OfferDetail', { oferta })} />
+        ),
+        [navigation]
+    );
     /**
      * Renderiza o overlay de like com callback estável para o Swiper.
      *
@@ -331,42 +351,49 @@ const SwipeOfertasScreen: React.FC = () => {
             </View>
 
             {/* Barra inferior de ações flutuando no rodapé */}
-            <View style={styles.actionsContainer}>
+            <View style={[styles.actionsContainer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
                 {/* Botão para descartar a oferta (Swipe Left) */}
-                <Button
+                <IconButton
+                    icon="close"
+                    size={40}
+                    iconColor={colors.error}
                     mode="outlined"
-                    onPress={() => swiperRef.current?.swipeLeft()}
+                    onPress={() => {
+                        Vibration.vibrate(10);
+                        swiperRef.current?.swipeLeft();
+                    }}
                     style={styles.actionButton}
-                    contentStyle={styles.actionButtonContent}
+                    hitSlop={10}
                     accessibilityLabel="Descartar oferta"
-                    accessibilityRole="button"
-                >
-                    <Icon name="close" size={24} color={colors.error} />
-                </Button>
+                />
 
                 {/* Botão para desfazer o último movimento */}
-                <Button
+                <IconButton
+                    icon="undo"
+                    size={24}
+                    iconColor={colors.onSurfaceVariant}
                     mode="outlined"
                     onPress={handleUndo}
-                    style={styles.undoButton}
-                    contentStyle={styles.undoButtonContent}
+                    disabled={currentIndex === 0}
+                    style={[styles.undoButton, currentIndex === 0 && { opacity: 0.5 }]}
+                    hitSlop={10}
                     accessibilityLabel="Desfazer último swipe"
-                    accessibilityRole="button"
-                >
-                    <Icon name="undo" size={20} color={colors.onSurfaceVariant} />
-                </Button>
+                />
 
                 {/* Botão para curtir a oferta (Swipe Right) */}
-                <Button
+                <IconButton
+                    icon="heart"
+                    size={40}
+                    iconColor={colors.success}
                     mode="outlined"
-                    onPress={() => swiperRef.current?.swipeRight()}
+                    onPress={() => {
+                        Vibration.vibrate(10);
+                        swiperRef.current?.swipeRight();
+                    }}
                     style={styles.actionButton}
-                    contentStyle={styles.actionButtonContent}
+                    hitSlop={10}
                     accessibilityLabel="Curtir oferta"
-                    accessibilityRole="button"
-                >
-                    <Icon name="heart" size={24} color={colors.success} />
-                </Button>
+                />
             </View>
 
             {isPaging && (
@@ -443,26 +470,12 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent', // Transparente para não bloquear o fundo se o card for longo
     },
     actionButton: {
-        borderRadius: 50,
-        width: 64,
-        height: 64,
         backgroundColor: colors.surface,
         elevation: 2,
     },
-    actionButtonContent: {
-        width: 64,
-        height: 64,
-    },
     undoButton: {
-        borderRadius: 50,
-        width: 50,
-        height: 50,
         backgroundColor: colors.surface,
         elevation: 1,
-    },
-    undoButtonContent: {
-        width: 50,
-        height: 50,
     },
     swiperArea: {
         flex: 1,
