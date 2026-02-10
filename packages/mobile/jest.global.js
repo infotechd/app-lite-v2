@@ -31,13 +31,10 @@ if (typeof globalThis.expo.SharedRef === 'undefined') {
 
 // Garantir que StyleSheet.flatten exista antes dos testes (necessário para RNTL formatters)
 try {
-    const RN = require('react-native');
-    if (RN && RN.StyleSheet) {
-        Object.defineProperty(RN.StyleSheet, 'flatten', {
-            value: (s) => (Array.isArray(s) ? Object.assign({}, ...s) : s),
-            writable: true,
-            configurable: true,
-        });
+    // Patch direto no módulo StyleSheet interno do RN para garantir que a RNTL enxergue o polyfill
+    const StyleSheetModule = require('react-native/Libraries/StyleSheet/StyleSheet');
+    if (typeof StyleSheetModule.flatten !== 'function') {
+        StyleSheetModule.flatten = (s) => (Array.isArray(s) ? Object.assign({}, ...s) : s);
     }
 } catch {}
 
