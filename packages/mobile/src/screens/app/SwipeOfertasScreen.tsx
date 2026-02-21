@@ -9,10 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { OfertasStackParamList } from '@/types';
 import { OfertaServico } from '@/types/oferta';
 import OfferSwipeCard from '@/components/offers/OfferSwipeCard';
+import OfferSwipeCardSkeleton from '@/components/offers/OfferSwipeCardSkeleton';
 import SwipeLikeOverlay from '@/components/offers/SwipeLikeOverlay';
 import SwipeNopeOverlay from '@/components/offers/SwipeNopeOverlay';
 import { useOfertaSwipe } from '@/hooks/useOfertaSwipe';
-import { colors, spacing, layout } from '@/styles/theme';
+import { colors, spacing, radius, layout } from '@/styles/theme';
 
 /**
  * Tela principal de exibição de ofertas no formato de "swipe" (cartões deslizáveis).
@@ -94,14 +95,40 @@ const SwipeOfertasScreen: React.FC = () => {
      */
     const renderNopeOverlay = useCallback(() => <SwipeNopeOverlay />, []);
 
-    // Exibe indicador de carregamento centralizado enquanto busca dados iniciais
+    // Exibe esqueleto de carregamento enquanto busca dados iniciais
     if (isInitialLoading && ofertas.length === 0) {
         return (
             <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text variant="bodyLarge" style={styles.loadingText}>
-                    Carregando ofertas...
-                </Text>
+                <View style={styles.skeletonWrapper}>
+                    {/* Simulando cards atrás para dar profundidade e efeito de deck */}
+                    <View 
+                        style={[
+                            styles.skeletonCardBehind, 
+                            { 
+                                width: cardWidth * 0.9, 
+                                transform: [{ translateY: 20 }, { scale: 0.9 }],
+                                opacity: 0.3
+                            }
+                        ]} 
+                    />
+                    <View 
+                        style={[
+                            styles.skeletonCardBehind, 
+                            { 
+                                width: cardWidth * 0.95, 
+                                transform: [{ translateY: 10 }, { scale: 0.95 }],
+                                opacity: 0.6
+                            }
+                        ]} 
+                    />
+                    <OfferSwipeCardSkeleton />
+                </View>
+                
+                <View style={styles.loadingInfo}>
+                    <Text variant="bodyMedium" style={styles.loadingText}>
+                        Buscando as melhores ofertas...
+                    </Text>
+                </View>
             </View>
         );
     }
@@ -231,8 +258,27 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
     },
     loadingText: {
-        marginTop: spacing.md,
         color: colors.onSurfaceVariant,
+    },
+    loadingInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        marginTop: spacing.xl,
+    },
+    skeletonWrapper: {
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.lg,
+    },
+    skeletonCardBehind: {
+        position: 'absolute',
+        aspectRatio: 16 / 14, // Proporção aproximada do card completo
+        backgroundColor: colors.surface,
+        borderRadius: radius.xl,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     emptyTitle: {
         marginTop: spacing.md,

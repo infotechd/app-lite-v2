@@ -8,6 +8,7 @@ import MediaProgressIndicator from '@/components/offers/MediaProgressIndicator';
 import { toAbsoluteMediaUrls } from '@/utils/mediaUrl';
 import { OfertaServico } from '@/types/oferta';
 import { colors, spacing, radius, layout } from '@/styles/theme';
+import { SkeletonBox } from '@/components/profile/skeletons/SkeletonPrimitives';
 
 interface OfferSwipeCardProps {
     item: OfertaServico;
@@ -87,6 +88,7 @@ const useOfferCardI18n = () => useMemo(() => offerCardStrings, []);
 const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, accessibilityHint, isMuted: propsMuted, onToggleMute: propsToggleMute, onPress }) => {
     const { width: windowWidth } = useWindowDimensions();
     const [imageErrored, setImageErrored] = useState(false);
+    const [mediaLoaded, setMediaLoaded] = useState(false);
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const [mediaWidth, setMediaWidth] = useState(0);
     const [localMuted, setLocalMuted] = useState(true);
@@ -203,16 +205,21 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
 
     // Resetar mídia quando o card deixar de ser ativo e quando o item mudar
     useEffect(() => {
-        if (!isActiveCard) setCurrentMediaIndex(0);
+        if (!isActiveCard) {
+            setCurrentMediaIndex(0);
+            setMediaLoaded(false);
+        }
     }, [isActiveCard]);
 
     useEffect(() => {
         setCurrentMediaIndex(0);
         setImageErrored(false);
+        setMediaLoaded(false);
     }, [item?._id]);
 
     useEffect(() => {
         setImageErrored(false);
+        setMediaLoaded(false);
     }, [currentMediaIndex]);
 
     // Efeito para mostrar uma dica visual sutil (pulse) na primeira vez que vê um card com múltiplas mídias
@@ -301,11 +308,24 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
 
                 {currentMedia ? (
                     currentMedia.type === 'video' ? (
-                        <>
-                            <VideoViewWrapper url={currentMedia.url} isActive={isActiveCard} isMuted={isMuted} />
+                        <View style={styles.image}>
+                            {!mediaLoaded && (
+                                <SkeletonBox
+                                    width="100%"
+                                    height="100%"
+                                    radius={0}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                            )}
+                            <VideoViewWrapper 
+                                url={currentMedia.url} 
+                                isActive={isActiveCard} 
+                                isMuted={isMuted} 
+                                onReady={() => setMediaLoaded(true)}
+                            />
                             
                             {/* Sinalização de Vídeo no canto inferior esquerdo */}
-                            <View style={styles.videoIndicator} pointerEvents="none">
+                            <View style={[styles.videoIndicator, { opacity: mediaLoaded ? 1 : 0 }]} pointerEvents="none">
                                 <Icon
                                     name="play"
                                     size={16}
@@ -314,36 +334,47 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
                             </View>
 
                             {/* Indicador de status de som no canto para vídeos */}
-                            <View style={styles.muteStatusIndicator} pointerEvents="none">
+                            <View style={[styles.muteStatusIndicator, { opacity: mediaLoaded ? 1 : 0 }]} pointerEvents="none">
                                 <Icon
                                     name={isMuted ? 'volume-off' : 'volume-high'}
                                     size={16}
                                     color="white"
                                 />
                             </View>
-                        </>
+                        </View>
                     ) : (
+                        <View style={styles.image}>
+                            {!mediaLoaded && (
+                                <SkeletonBox
+                                    width="100%"
+                                    height="100%"
+                                    radius={0}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                            )}
+                            <Image
+                                source={{ uri: imageErrored ? FALLBACK_IMAGE : currentMedia.url }}
+                                style={styles.image}
+                                contentFit="cover"
+                                transition={300}
+                                accessibilityLabel={accessibilityImageLabel}
+                                accessibilityIgnoresInvertColors={false}
+                                onLoad={() => setMediaLoaded(true)}
+                                onError={handleImageError}
+                            />
+                        </View>
+                    )
+                ) : (
+                    <View style={styles.image}>
                         <Image
-                            source={{ uri: imageErrored ? FALLBACK_IMAGE : currentMedia.url }}
+                            source={{ uri: FALLBACK_IMAGE }}
                             style={styles.image}
                             contentFit="cover"
                             transition={300}
                             accessibilityLabel={accessibilityImageLabel}
                             accessibilityIgnoresInvertColors={false}
-                            placeholder={PLACEHOLDER_BLURHASH}
-                            onError={handleImageError}
                         />
-                    )
-                ) : (
-                    <Image
-                        source={{ uri: FALLBACK_IMAGE }}
-                        style={styles.image}
-                        contentFit="cover"
-                        transition={300}
-                        accessibilityLabel={accessibilityImageLabel}
-                        accessibilityIgnoresInvertColors={false}
-                        placeholder={PLACEHOLDER_BLURHASH}
-                    />
+                    </View>
                 )}
             </Pressable>
 
@@ -429,7 +460,7 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
 };
 
 // Componente interno de vídeo com auto play/pause baseado em visibilidade do card
-const VideoViewWrapper: React.FC<{ url: string; isActive: boolean; isMuted: boolean }> = ({ url, isActive, isMuted }) => {
+const VideoViewWrapper: React.FC<{ url: string; isActive: boolean; isMuted: boolean; onReady?: () => void }> = ({ url, isActive, isMuted, onReady }) => {
     const player = useVideoPlayer(url, (p) => {
         p.loop = true;
         p.muted = isMuted;
@@ -441,9 +472,16 @@ const VideoViewWrapper: React.FC<{ url: string; isActive: boolean; isMuted: bool
 
     useEffect(() => {
         try {
-            if (isActive) player.play(); else player.pause();
+            if (isActive) {
+                player.play();
+                // Assumimos ready se o player existir e começou a tocar, 
+                // para um feedback de skeleton mais simples para vídeos
+                if (onReady) onReady();
+            } else {
+                player.pause();
+            }
         } catch {}
-    }, [isActive, player, url]);
+    }, [isActive, player, url, onReady]);
 
     return (
         <VideoView
