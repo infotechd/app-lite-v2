@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, useWindowDimensions, Platform, Pressable, LayoutChangeEvent, GestureResponderEvent } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, Platform, Pressable, LayoutChangeEvent, GestureResponderEvent, Animated } from 'react-native';
 import { Card, Text, Avatar } from 'react-native-paper';
+import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import MediaProgressIndicator from '@/components/offers/MediaProgressIndicator';
@@ -83,6 +84,25 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
     const [mediaWidth, setMediaWidth] = useState(0);
     const strings = useOfferCardI18n();
 
+    const leftFlashAnim = useMemo(() => new Animated.Value(0), []);
+    const rightFlashAnim = useMemo(() => new Animated.Value(0), []);
+
+    const triggerFlash = useCallback((anim: Animated.Value) => {
+        anim.setValue(0);
+        Animated.sequence([
+            Animated.timing(anim, {
+                toValue: 1,
+                duration: 100,
+                useNativeDriver: true,
+            }),
+            Animated.timing(anim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
+
     const imageUrls = useMemo(() => toAbsoluteMediaUrls(item?.imagens), [item?.imagens]);
     const videoUrls = useMemo(() => toAbsoluteMediaUrls(item?.videos), [item?.videos]);
     const allMedia: MediaItem[] = useMemo(
@@ -143,13 +163,19 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
         const left = width / 3;
         const right = (2 * width) / 3;
         if (x < left) {
-            setCurrentMediaIndex((prev) => Math.max(0, prev - 1));
+            if (currentMediaIndex > 0) {
+                setCurrentMediaIndex((prev) => Math.max(0, prev - 1));
+                triggerFlash(leftFlashAnim);
+            }
         } else if (x > right) {
-            setCurrentMediaIndex((prev) => Math.min(allMedia.length - 1, prev + 1));
+            if (currentMediaIndex < allMedia.length - 1) {
+                setCurrentMediaIndex((prev) => Math.min(allMedia.length - 1, prev + 1));
+                triggerFlash(rightFlashAnim);
+            }
         } else {
             // centro: reservado para toggle de som (futuro)
         }
-    }, [mediaWidth, cardWidth, allMedia.length]);
+    }, [mediaWidth, cardWidth, allMedia.length, currentMediaIndex, triggerFlash, leftFlashAnim, rightFlashAnim]);
 
     // Resetar mídia quando o card deixar de ser ativo e quando o item mudar
     useEffect(() => {
@@ -184,6 +210,23 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
                 accessibilityHint="Toque à esquerda/direita para navegar entre as mídias"
             >
                 <MediaProgressIndicator count={allMedia.length} currentIndex={currentMediaIndex} />
+
+                {/* Feedback visual esquerdo (Flash + Seta) */}
+                <Animated.View
+                    style={[styles.flashOverlay, styles.leftFlash, { opacity: leftFlashAnim }]}
+                    pointerEvents="none"
+                >
+                    <Icon name="chevron-left" size={48} color="rgba(255, 255, 255, 0.8)" />
+                </Animated.View>
+
+                {/* Feedback visual direito (Flash + Seta) */}
+                <Animated.View
+                    style={[styles.flashOverlay, styles.rightFlash, { opacity: rightFlashAnim }]}
+                    pointerEvents="none"
+                >
+                    <Icon name="chevron-right" size={48} color="rgba(255, 255, 255, 0.8)" />
+                </Animated.View>
+
                 {currentMedia ? (
                     currentMedia.type === 'video' ? (
                         <VideoViewWrapper url={currentMedia.url} isActive={isActiveCard} />
@@ -348,6 +391,25 @@ const styles = StyleSheet.create({
     image: {
         width: '100%',
         height: '100%',
+    },
+    flashOverlay: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        width: '33.3%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 15, // Acima do MediaProgressIndicator (que é 10)
+    },
+    leftFlash: {
+        left: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderTopLeftRadius: radius.xl, // Mantendo o raio do card se necessário, embora o card tenha overflow hidden
+    },
+    rightFlash: {
+        right: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderTopRightRadius: radius.xl,
     },
     contentContainer: {
         flex: 1,
