@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, useWindowDimensions, Platform, Pressable, LayoutChangeEvent, GestureResponderEvent, Animated } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, Platform, Pressable, LayoutChangeEvent, GestureResponderEvent, Animated, Vibration } from 'react-native';
 import { Card, Text, Avatar } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
@@ -179,11 +179,13 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
             if (currentMediaIndex > 0) {
                 setCurrentMediaIndex((prev) => Math.max(0, prev - 1));
                 triggerFlash(leftFlashAnim);
+                Vibration.vibrate(10);
             }
         } else if (x > right) {
             if (currentMediaIndex < allMedia.length - 1) {
                 setCurrentMediaIndex((prev) => Math.min(allMedia.length - 1, prev + 1));
                 triggerFlash(rightFlashAnim);
+                Vibration.vibrate(10);
             }
         } else {
             // centro: toggle de som
