@@ -8,7 +8,7 @@ export const getShimmerColor = (scheme: 'light' | 'dark' | null | undefined) =>
 
 type SkeletonBoxProps = {
   width?: number | `${number}%`;
-  height?: number;
+  height?: number | `${number}%`;
   radius?: number;
   style?: StyleProp<ViewStyle>;
   testID?: string;
