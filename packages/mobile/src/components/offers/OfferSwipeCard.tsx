@@ -256,6 +256,7 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
                 accessibilityRole="image"
                 accessibilityLabel={accessibilityImageLabel}
                 accessibilityHint={strings.ACCESSIBILITY.MEDIA_NAV_HINT}
+                testID="media-pressable"
             >
                 <MediaProgressIndicator 
                     count={allMedia.length} 
@@ -267,6 +268,7 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
                 <Animated.View
                     style={[styles.flashOverlay, styles.leftFlash, { opacity: leftFlashAnim }]}
                     pointerEvents="none"
+                    testID="media-flash-left"
                 >
                     <Icon name="chevron-left" size={48} color="rgba(255, 255, 255, 0.8)" />
                 </Animated.View>
@@ -275,6 +277,7 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
                 <Animated.View
                     style={[styles.flashOverlay, styles.rightFlash, { opacity: rightFlashAnim }]}
                     pointerEvents="none"
+                    testID="media-flash-right"
                 >
                     <Icon name="chevron-right" size={48} color="rgba(255, 255, 255, 0.8)" />
                 </Animated.View>
@@ -283,6 +286,7 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, acc
                 <Animated.View
                     style={[styles.flashOverlay, styles.centerFlash, { opacity: centerFlashAnim }]}
                     pointerEvents="none"
+                    testID="media-flash-center"
                 >
                     <Icon
                         name={isMuted ? 'volume-off' : 'volume-high'}
