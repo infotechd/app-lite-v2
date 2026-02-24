@@ -48,8 +48,6 @@ export const useOfertaSwipe = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     // Armazena mensagens de erro para exibição de feedback ao usuário
     const [error, setError] = useState<string | null>(null);
-    // Controla o número da página atual para a paginação da API
-    const [page, setPage] = useState(1);
     // Indica se o servidor ainda possui mais registros para as próximas páginas
     const [hasMore, setHasMore] = useState(true);
     // Indica se a lista está vazia, usado para mostrar telas de Empty State
@@ -61,6 +59,8 @@ export const useOfertaSwipe = () => {
 
     // Referência para acessar métodos imperativos do Swiper (ex: swipeBack)
     const swiperRef = useRef<SwiperCardRefType>(null);
+    // Referência para rastrear a última página carregada, evitando stale closure na paginação
+    const latestPageRef = useRef(1);
     // Referência para o timer de debounce, evitando chamadas repetitivas de paginação
     const paginationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Contador de requisições para evitar race conditions (ignora respostas de chamadas antigas)
@@ -75,7 +75,7 @@ export const useOfertaSwipe = () => {
     });
 
     // Extrai informações de autenticação do contexto global
-    const { isAuthenticated, user } = useAuth();
+    const { isAuthenticated, user, isLoading } = useAuth();
 
     /**
      * Limpa qualquer agendamento de paginação pendente.
@@ -117,6 +117,11 @@ export const useOfertaSwipe = () => {
                 const filters: OfertaFilters = {};
                 const currentUserId = user?.id;
 
+                // Em desenvolvimento, podemos ignorar o filtro de interações para facilitar testes
+                if (__DEV__) {
+                    filters.ignoreInteracted = true;
+                }
+
                 // Adiciona o ID do usuário aos filtros se estiver autenticado para ofertas personalizadas
                 if (isAuthenticated && typeof currentUserId === 'string' && currentUserId.length > 0) {
                     filters.userId = currentUserId;
@@ -136,7 +141,7 @@ export const useOfertaSwipe = () => {
 
                 // Atualiza estados baseados no resultado da API
                 setHasMore(!noMorePages);
-                setPage(currentPage);
+                latestPageRef.current = currentPage;
 
                 // Se append for true, soma à lista atual, senão substitui (usado no refresh/inicial)
                 setOfertas((prev) => (append ? [...prev, ...newOfertas] : newOfertas));
@@ -186,16 +191,20 @@ export const useOfertaSwipe = () => {
         paginationDebounceRef.current = setTimeout(() => {
             // Re-verifica as condições após o timeout
             if (!hasMore || isPaging) return;
-            const nextPage = page + 1;
+            const nextPage = latestPageRef.current + 1;
             void loadOfertas(nextPage, true, 'paginate');
         }, 300);
-    }, [clearPaginationDebounce, hasMore, isPaging, loadOfertas, page]);
+    }, [clearPaginationDebounce, hasMore, isPaging, loadOfertas]);
 
     /**
      * Efeito inicial para carregar as ofertas assim que o hook é montado.
      * Também lida com a limpeza de timers e cancelamento de requisições no unmount.
      */
     useEffect(() => {
+        // Se a autenticação ainda está carregando, não inicia a busca inicial
+        // Isso evita buscas "anônimas" que seriam recarregadas em seguida
+        if (isLoading) return;
+
         void loadOfertas(1, false, 'initial');
 
         return () => {
@@ -203,7 +212,7 @@ export const useOfertaSwipe = () => {
             clearPaginationDebounce();
             requestIdRef.current += 1;
         };
-    }, [clearPaginationDebounce, loadOfertas]);
+    }, [isLoading, clearPaginationDebounce, loadOfertas]);
 
     /**
      * Efeito para realizar o pré-carregamento (prefetch) de mídias dos próximos cards.
@@ -323,12 +332,13 @@ export const useOfertaSwipe = () => {
         }
 
         // Quando o usuário consome todas as cartas do deck atual, carregamos a próxima página
-        // substituindo o deck (append = false). Isso evita que o Swiper permaneça em estado
-        // "swiped all" e garante que os novos itens sejam exibidos imediatamente.
+        // mantendo o deck atual e acrescentando os novos itens (append = true). 
+        // Isso evita que o Swiper permaneça em estado "swiped all" e garante que 
+        // a sequência de ofertas seja fluida.
         clearPaginationDebounce();
-        const nextPage = page + 1;
+        const nextPage = latestPageRef.current + 1;
         void loadOfertas(nextPage, true, 'paginate');
-    }, [hasMore, page, clearPaginationDebounce, loadOfertas]);
+    }, [hasMore, clearPaginationDebounce, loadOfertas]);
 
     /**
      * Permite ao usuário desfazer o último swipe realizado.
@@ -357,7 +367,6 @@ export const useOfertaSwipe = () => {
      * @returns {Promise<void>}
      */
     const handleRefresh = useCallback(async () => {
-        setPage(1);
         setHasMore(true);
         setIsEmpty(false);
         setCurrentIndex(0);

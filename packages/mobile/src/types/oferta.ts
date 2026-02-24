@@ -61,4 +61,6 @@ export interface OfertaFilters {
     lng?: number;
     // ID do usuário para filtrar ofertas já interagidas (Swipe)
     userId?: string;
+    // Se true, backend ignora filtro de interações (dev/testes)
+    ignoreInteracted?: boolean;
 }
