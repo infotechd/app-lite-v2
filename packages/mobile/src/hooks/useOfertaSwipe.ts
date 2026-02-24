@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Vibration } from 'react-native';
+import { vibrateLight } from '@/utils/haptics';
 import { type SwiperCardRefType } from 'rn-swiper-list';
 import { Image } from 'expo-image';
 import { toAbsoluteMediaUrls } from '@/utils/mediaUrl';
@@ -253,7 +253,7 @@ export const useOfertaSwipe = () => {
             if (!oferta) return;
 
             // Feedback tátil leve
-            Vibration.vibrate(10);
+            vibrateLight();
 
             // Registra a interação de Like no servidor
             if (isAuthenticated) {
@@ -288,7 +288,7 @@ export const useOfertaSwipe = () => {
             if (!oferta) return;
 
             // Feedback tátil leve
-            Vibration.vibrate(10);
+            vibrateLight();
 
             // Registra a interação de Dislike no servidor
             if (isAuthenticated) {
@@ -327,7 +327,7 @@ export const useOfertaSwipe = () => {
         // "swiped all" e garante que os novos itens sejam exibidos imediatamente.
         clearPaginationDebounce();
         const nextPage = page + 1;
-        void loadOfertas(nextPage, false, 'paginate');
+        void loadOfertas(nextPage, true, 'paginate');
     }, [hasMore, page, clearPaginationDebounce, loadOfertas]);
 
     /**
@@ -344,7 +344,7 @@ export const useOfertaSwipe = () => {
 
             // Chama o método nativo do Swiper para voltar a carta
             swiper.swipeBack();
-            Vibration.vibrate(10);
+            vibrateLight();
         } catch (err) {
             if (__DEV__) console.error(err);
         }
