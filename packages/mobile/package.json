@@ -4,7 +4,7 @@
   "description": "Super App Mobile - React Native + Expo",
   "main": "index.tsx",
   "scripts": {
-    "start": "expo start --go",
+    "start": "expo start --dev-client",
     "web": "expo start --web",
     "test": "jest --config ./jest.config.js --coverage",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",

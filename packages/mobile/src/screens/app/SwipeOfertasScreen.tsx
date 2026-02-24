@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, useWindowDimensions, Vibration } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { vibrateLight } from '@/utils/haptics';
 import { Text, Button, Snackbar, IconButton } from 'react-native-paper';
 import { Swiper } from 'rn-swiper-list';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
@@ -193,7 +194,7 @@ const SwipeOfertasScreen: React.FC = () => {
                     iconColor={colors.error}
                     mode="outlined"
                     onPress={() => {
-                        Vibration.vibrate(10);
+                        vibrateLight();
                         swiperRef.current?.swipeLeft();
                     }}
                     style={styles.actionButton}
@@ -221,7 +222,7 @@ const SwipeOfertasScreen: React.FC = () => {
                     iconColor={colors.success}
                     mode="outlined"
                     onPress={() => {
-                        Vibration.vibrate(10);
+                        vibrateLight();
                         swiperRef.current?.swipeRight();
                     }}
                     style={styles.actionButton}

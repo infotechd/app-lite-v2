@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, useWindowDimensions, Platform, Pressable, LayoutChangeEvent, GestureResponderEvent, Animated, Vibration } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, Platform, Pressable, LayoutChangeEvent, GestureResponderEvent, Animated } from 'react-native';
+import { vibrateLight } from '@/utils/haptics';
 import { Card, Text, Avatar } from 'react-native-paper';
 import Icon from '@expo/vector-icons/MaterialCommunityIcons';
 import { Image } from 'expo-image';
@@ -171,13 +172,13 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, ind
             if (currentMediaIndex > 0) {
                 setCurrentMediaIndex((prev) => Math.max(0, prev - 1));
                 triggerFlash(leftFlashAnim);
-                Vibration.vibrate(10);
+                vibrateLight();
             }
         } else if (x > right) {
             if (currentMediaIndex < allMedia.length - 1) {
                 setCurrentMediaIndex((prev) => Math.min(allMedia.length - 1, prev + 1));
                 triggerFlash(rightFlashAnim);
-                Vibration.vibrate(10);
+                vibrateLight();
             }
         } else {
             // centro: toggle de som
@@ -474,14 +475,42 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, ind
 };
 
 // Componente interno de vídeo com auto play/pause baseado em visibilidade do card
-const VideoViewWrapper: React.FC<{ 
-    url: string; 
-    isActive: boolean; 
-    isMuted: boolean; 
+const VideoViewWrapper: React.FC<{
+    url: string;
+    isActive: boolean;
+    isMuted: boolean;
     onReady?: () => void;
     onError?: (error: any) => void;
     onProgressUpdate?: (progress: number) => void;
 }> = ({ url, isActive, isMuted, onReady, onError, onProgressUpdate }) => {
+
+    // Fallback para Web: expo-video/VideoView não tem suporte garantido no navegador.
+    // Renderizamos uma tag <video> nativa do HTML via react-native-web.
+    if (Platform.OS === 'web') {
+        return (
+            <View style={styles.image}>
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                    src={url}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    autoPlay={isActive}
+                    loop
+                    muted={isMuted}
+                    playsInline
+                    onCanPlay={onReady}
+                    onError={onError}
+                    onTimeUpdate={(e) => {
+                        const target = e.currentTarget;
+                        if (onProgressUpdate && target.duration > 0) {
+                            onProgressUpdate(target.currentTime / target.duration);
+                        }
+                    }}
+                />
+            </View>
+        );
+    }
+
+    // Implementação nativa (iOS/Android) — sem alterações
     const player = useVideoPlayer(url, (p) => {
         p.loop = true;
         p.muted = isMuted;
@@ -493,13 +522,11 @@ const VideoViewWrapper: React.FC<{
                 onProgressUpdate(payload.currentTime / player.duration);
             }
         });
-
         const statusSub = player.addListener('statusChange', (payload: any) => {
             if (payload.status === 'error' && onError) {
                 onError(payload.error || { message: 'Erro de reprodução de vídeo' });
             }
         });
-
         return () => {
             timeSub.remove();
             statusSub.remove();
@@ -514,8 +541,6 @@ const VideoViewWrapper: React.FC<{
         try {
             if (isActive) {
                 player.play();
-                // Assumimos ready se o player existir e começou a tocar, 
-                // para um feedback de skeleton mais simples para vídeos
                 if (onReady) onReady();
             } else {
                 player.pause();
