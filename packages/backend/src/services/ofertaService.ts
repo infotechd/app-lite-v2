@@ -55,6 +55,8 @@ export interface ListFilters {
     page?: number;
     limit?: number;
     userId?: string;
+    /** Se verdadeiro, ignora o filtro de ofertas já interagidas (útil para testes/dev) */
+    ignoreInteracted?: boolean;
 }
 
 /**
@@ -82,12 +84,15 @@ export const ofertaService = {
         const {
             categoria, subcategoria, tipoPessoa, precoMin, precoMax, cidade, estado,
             busca, sort = 'relevancia', comMidia, lat, lng, page = 1, limit = 10,
-            userId,
+            userId, ignoreInteracted = false,
         } = filters;
 
         // Inicializa a query filtrando apenas ofertas ativas
         const query: OfertaFilterQuery = { status: { $ne: 'inativo' } };
-        if (userId) {
+        
+        // Se houver userId, filtra ofertas com as quais o usuário já interagiu
+        // a menos que ignoreInteracted seja verdadeiro.
+        if (userId && !ignoreInteracted) {
             const interactedIds = await interactionService.getInteractedOfferIds(userId);
             if (interactedIds.length > 0) {
                 query._id = { $nin: interactedIds };

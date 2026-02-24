@@ -71,6 +71,8 @@ export const ofertaController = {
                 lng: q.lng ? Number(q.lng) : undefined,
                 // Prioriza o ID do usuário vindo da autenticação (mais seguro), mas aceita da query
                 userId: req.user?.id || (q as any).userId,
+                // Permite ignorar o filtro de interações (útil para testes em localhost)
+                ignoreInteracted: q.ignoreInteracted === true || (q as any).ignoreInteracted === 'true',
             };
             // --- FIM DA CORREÇÃO 2 ---
 

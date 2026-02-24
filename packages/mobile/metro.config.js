@@ -19,11 +19,12 @@ config.resolver.nodeModulesPaths = [
     path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-// Garante que extensões específicas de plataforma web sejam resolvidas com prioridade.
-// O Metro resolve na ordem do array: .web.tsx antes de .tsx, etc.
+// NÃO modificar sourceExts para incluir prefixos de plataforma.
+// O Metro resolve .web.tsx, .ios.tsx, etc. automaticamente via resolver.platforms.
+// Apenas garantir que as extensões padrão estejam presentes:
 config.resolver.sourceExts = [
-    'web.tsx', 'web.ts', 'web.js',
     ...(config.resolver.sourceExts || ['tsx', 'ts', 'jsx', 'js', 'json']),
+    'mjs', // necessário para alguns pacotes ESM
 ];
 
 // Aliases explícitos para fixar a origem dos módulos nativos críticos
