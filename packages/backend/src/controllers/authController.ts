@@ -487,6 +487,7 @@ export const resetPassword = async (req: AuthRequest, res: Response): Promise<vo
  */
 export const resetPasswordDeepLink = (req: Request, res: Response): void => {
     const token = String((req.params as any)?.token || '').trim();
+    const nonce = res.locals.cspNonce || '';
     const schemeUrl = `applite://reset-password/${token}`;
     // Intent Android: Mais robusto que o esquema customizado em navegadores mobile
     const androidIntent = `intent://reset-password/${token}#Intent;scheme=applite;package=com.infotechd.applite;end`;
@@ -552,7 +553,7 @@ export const resetPasswordDeepLink = (req: Request, res: Response): void => {
     </div>
   </div>
 
-  <script>
+  <script nonce="${nonce}">
     (function() {
       var schemeUrl = '${schemeUrl}';
       var androidIntent = '${androidIntent}';

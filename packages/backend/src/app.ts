@@ -5,6 +5,8 @@
  */
 
 import express, { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
+import { IncomingMessage, ServerResponse } from 'http';
 import config from './config';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -23,7 +25,37 @@ const app: express.Application = express();
  * - Helmet adiciona diversos cabeçalhos de segurança (HSTS, CSP, etc).
  */
 app.disable('x-powered-by');
-app.use(helmet());
+
+/**
+ * Gera um nonce criptográfico único por requisição e o disponibiliza em res.locals.
+ * Esse nonce é usado pelo Helmet CSP para permitir scripts inline específicos
+ * (ex: página intermediária de deep link do reset de senha).
+ */
+app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+    next();
+});
+
+app.use(
+    helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: [
+                    "'self'",
+                    // Permite scripts inline que possuam o nonce gerado para esta requisição
+                    (_req: IncomingMessage, res: ServerResponse) => `'nonce-${(res as unknown as Record<string, Record<string, string>>).locals.cspNonce}'`,
+                ],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: ["'self'", 'data:', 'https:'],
+                connectSrc: ["'self'", 'https:'],
+                fontSrc: ["'self'", 'https:', 'data:'],
+                objectSrc: ["'none'"],
+                upgradeInsecureRequests: [],
+            },
+        },
+    })
+);
 
 /**
  * Configuração de CORS (Cross-Origin Resource Sharing).
