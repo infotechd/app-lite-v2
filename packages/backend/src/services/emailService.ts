@@ -15,6 +15,7 @@ const emailEnvSchema = z.object({
     SMTP_PASS: z.string().optional(),
     EMAIL_FROM: z.string().default('noreply@applite.com'),
     APP_URL: z.string().optional(),
+    API_URL: z.string().optional(),
 });
 
 /** Instância validada das variáveis de ambiente */
@@ -165,8 +166,10 @@ class EmailService {
                  <div style="font-size:28px;letter-spacing:6px;font-weight:700;color:#111">${resetCode}</div>
                </div>`
             : '';
-        const baseUrl = (env.APP_URL && env.APP_URL.trim()) ? env.APP_URL.replace(/\/+$/, '') : 'https://app-super.digital';
-        const webLink = `${baseUrl}/api/auth/reset-password/${token}`;
+        // Usa API_URL (subdomínio da API) para o link do email, pois a rota
+        // GET /api/auth/reset-password/:token é servida pelo backend (não pelo frontend estático).
+        const apiUrl = (env.API_URL && env.API_URL.trim()) ? env.API_URL.replace(/\/+$/, '') : 'https://api.app-super.digital';
+        const webLink = `${apiUrl}/api/auth/reset-password/${token}`;
 
         const htmlContent = `
   <div style="margin:0;padding:0;background:#f5f7fb">

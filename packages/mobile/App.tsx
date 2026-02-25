@@ -19,7 +19,14 @@ const linking: LinkingOptions<RootStackParamList> = {
         screens: {
             Auth: {
                 screens: {
-                    ResetPassword: 'reset-password/:token',
+                    Login: 'Login',
+                    ForgotPassword: 'ForgotPassword',
+                    ResetPassword: {
+                        path: 'reset-password/:token?',
+                        parse: {
+                            token: (token: string) => token || '',
+                        },
+                    },
                 },
             },
         },

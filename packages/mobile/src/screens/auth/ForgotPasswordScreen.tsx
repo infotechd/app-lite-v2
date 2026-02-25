@@ -47,7 +47,8 @@ const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             showAlert('Tudo certo', 'Se este e-mail existir, enviaremos instruções em breve.');
             
             // Navega para a tela de redefinição de senha, passando o e-mail como parâmetro.
-            navigation.navigate('ResetPassword', { email: email.trim() });
+            // Nota: token é passado como string vazia para evitar 'undefined' na URL web.
+            navigation.navigate('ResetPassword', { email: email.trim(), token: '' });
         } catch (err: any) {
             // Captura erros da API e exibe para o usuário.
             showAlert('Erro', err?.message || 'Não foi possível enviar o e-mail.');
