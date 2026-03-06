@@ -147,10 +147,7 @@ const UserSchema = new Schema<IUser>({
         trim: true,
         validate: {
             validator: function(this: IUser, razaoSocial: string | undefined) {
-                if (this.tipoPessoa === 'PJ' && !razaoSocial) {
-                    return false;
-                }
-                return true;
+                return this.tipoPessoa !== 'PJ' || Boolean(razaoSocial);
             },
             message: 'Razão social é obrigatória para Pessoa Jurídica'
         }

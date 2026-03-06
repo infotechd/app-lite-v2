@@ -36,13 +36,17 @@ export const OFFER_TRANSLATIONS = {
     OVERLAYS: {
         LIKE: 'GOSTEI!',
         NOPE: 'NÃO',
+        SKIP: 'PULAR',
         ACCESSIBILITY_LIKE: 'Indicação de que você gostou da oferta',
         ACCESSIBILITY_NOPE: 'Indicação de que você não gostou da oferta',
+        ACCESSIBILITY_SKIP: 'Indicação de que você pulou a oferta',
     },
     ACTIONS: {
         LIKE: 'Curtir oferta',
         DISLIKE: 'Descartar oferta',
         UNDO: 'Desfazer último swipe',
+        UNDO_ERROR: 'Não é possível voltar mais.',
+        SKIP: 'Pular oferta',
         SWITCH_TO_LIST: 'Mudar para lista',
     },
 } as const;
