@@ -173,10 +173,10 @@ class EmailService {
 
         const htmlContent = `
   <div style="margin:0;padding:0;background:#f5f7fb">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#f5f7fb;padding:24px 0">
+    <table role="presentation" style="width:100%;border-collapse:collapse;border:0;border-spacing:0;background:#f5f7fb;">
       <tr>
-        <td align="center">
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,0.06)">
+        <td style="padding:24px 0;text-align:center;vertical-align:top;">
+          <table role="presentation" style="width:100%;max-width:600px;margin:0 auto;border-collapse:collapse;border:0;border-spacing:0;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,0.06)">
             <tr>
               <td style="padding:24px 24px 8px 24px;background:${primary};color:#fff;font-family:Inter,Segoe UI,Arial,sans-serif">
                 <h1 style="margin:0;font-size:22px;font-weight:700">App Lite</h1>

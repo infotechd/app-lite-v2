@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, useWindowDimensions, Platform, GestureResponderEvent, TouchableOpacity } from 'react-native';
 import { vibrateLight } from '@/utils/haptics';
 import { Text, Button, Snackbar, IconButton } from 'react-native-paper';
 import { Swiper } from 'rn-swiper-list';
@@ -13,6 +13,7 @@ import OfferSwipeCard from '@/components/offers/OfferSwipeCard';
 import OfferSwipeCardSkeleton from '@/components/offers/OfferSwipeCardSkeleton';
 import SwipeLikeOverlay from '@/components/offers/SwipeLikeOverlay';
 import SwipeNopeOverlay from '@/components/offers/SwipeNopeOverlay';
+import SwipeSkipOverlay from '@/components/offers/SwipeSkipOverlay';
 import { useOfertaSwipe } from '@/hooks/useOfertaSwipe';
 import { colors, spacing, radius, layout } from '@/styles/theme';
 import { OFFER_TRANSLATIONS } from '@/constants/translations';
@@ -34,6 +35,7 @@ const SwipeOfertasScreen: React.FC = () => {
         swiperRef,
         handleSwipeRight,
         handleSwipeLeft,
+        handleSwipeTop,
         handleSwipedAll,
         handleUndo,
         handleRefresh,
@@ -98,6 +100,12 @@ const SwipeOfertasScreen: React.FC = () => {
      * @returns {React.JSX.Element} Componente de overlay de dislike.
      */
     const renderNopeOverlay = useCallback(() => <SwipeNopeOverlay />, []);
+    /**
+     * Renderiza o overlay de skip com callback estável para o Swiper.
+     *
+     * @returns {React.JSX.Element} Componente de overlay de skip.
+     */
+    const renderSkipOverlay = useCallback(() => <SwipeSkipOverlay />, []);
 
     // Exibe esqueleto de carregamento enquanto busca dados iniciais
     if (isInitialLoading && ofertas.length === 0) {
@@ -173,12 +181,13 @@ const SwipeOfertasScreen: React.FC = () => {
                         renderCard={renderCard}
                         OverlayLabelRight={renderLikeOverlay}
                         OverlayLabelLeft={renderNopeOverlay}
+                        OverlayLabelTop={renderSkipOverlay}
                         onSwipeRight={handleSwipeRight}
                         onSwipeLeft={handleSwipeLeft}
+                        onSwipeTop={handleSwipeTop}
                         onSwipedAll={handleSwipedAll}
                         onIndexChange={setCurrentIndex}
                         prerenderItems={5}
-                        initialIndex={currentIndex}
                         keyExtractor={(item: OfertaServico, index: number) => (item as any)?._id ?? (item as any)?.id ?? index}
                         cardStyle={[styles.cardContainer, { width: cardWidth }]}
                     />
@@ -203,16 +212,50 @@ const SwipeOfertasScreen: React.FC = () => {
                 />
 
                 {/* Botão para desfazer o último movimento */}
-                <IconButton
-                    icon="undo"
-                    size={24}
-                    iconColor={colors.onSurfaceVariant}
-                    mode="outlined"
-                    onPress={handleUndo}
+                <TouchableOpacity
+                    onPress={() => {
+                        // Na Web, o onPress (onClick) funciona melhor que onPressIn se não houver conflitos de foco.
+                        // O problema de "clique duplo" foi corrigido pelo setTimeout no hook.
+                        if (currentIndex > 0) {
+                            handleUndo();
+                        }
+                    }}
                     disabled={currentIndex === 0}
-                    style={[styles.undoButton, currentIndex === 0 && { opacity: 0.5 }]}
-                    hitSlop={10}
+                    style={[
+                        styles.undoButton,
+                        {
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: colors.outlineVariant,
+                            zIndex: 2000,
+                        },
+                        currentIndex === 0 && { opacity: 0.5 }
+                    ]}
+                    // hitSlop generoso para facilitar o toque
+                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                     accessibilityLabel={OFFER_TRANSLATIONS.ACTIONS.UNDO}
+                    accessibilityRole="button"
+                >
+                    <Icon name="undo" size={24} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
+
+                {/* Botão para pular a oferta (Swipe Top) - Centralizado */}
+                <IconButton
+                    icon="arrow-up"
+                    size={40}
+                    iconColor={colors.primary}
+                    mode="outlined"
+                    onPress={() => {
+                        vibrateLight();
+                        swiperRef.current?.swipeTop();
+                    }}
+                    style={styles.actionButton}
+                    hitSlop={10}
+                    accessibilityLabel={OFFER_TRANSLATIONS.ACTIONS.SKIP}
                 />
 
                 {/* Botão para curtir a oferta (Swipe Right) */}
@@ -317,7 +360,9 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.lg,
         paddingBottom: spacing.xl,
         gap: spacing.md,
-        backgroundColor: 'transparent', // Transparente para não bloquear o fundo se o card for longo
+        backgroundColor: 'transparent',
+        zIndex: 1000, // Garante que a barra de ações fique acima do Swiper na web
+        elevation: 10, // Garante que fique acima no Android
     },
     actionButton: {
         backgroundColor: colors.surface,
@@ -346,5 +391,4 @@ const styles = StyleSheet.create({
 });
 
 export default SwipeOfertasScreen;
-
 

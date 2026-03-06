@@ -552,7 +552,7 @@ const OfferSwipeCard: React.FC<OfferSwipeCardProps> = ({ item, isActiveCard, ind
                             
                             // Se o prestador da oferta for o usuário logado, utiliza os dados mais recentes do AuthContext
                             // Caso contrário, utiliza os dados denormalizados da oferta com fallback para a localização da própria oferta
-                            const prestadorId = item.prestador.id || item.prestador._id;
+                            const prestadorId = item.prestador._id;
                             const isMe = currentUser && (currentUser.id === prestadorId);
                             
                             const res = isMe 

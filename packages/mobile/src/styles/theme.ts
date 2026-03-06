@@ -50,6 +50,7 @@ type ColorTokens = {
     warning: string;
     backdrop: string;
     textDisabled: string;
+    outlineVariant: string;
 };
 
 const lightTokens: ColorTokens = {
@@ -67,6 +68,7 @@ const lightTokens: ColorTokens = {
     warning: '#FF9800',
     backdrop: '#EAEAEA',
     textDisabled: '#D1D1D1',
+    outlineVariant: '#CAC4D0',
 };
 
 /*

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { Platform } from 'react-native';
 import { vibrateLight } from '@/utils/haptics';
 import { type SwiperCardRefType } from 'rn-swiper-list';
 import { Image } from 'expo-image';
@@ -7,6 +8,7 @@ import { OfertaServico, OfertaFilters } from '@/types/oferta';
 import { ofertaService } from '@/services/ofertaService';
 import { interactionService } from '@/services/interactionService';
 import { useAuth } from '@/context/AuthContext';
+import { OFFER_TRANSLATIONS } from '@/constants/translations';
 
 // Tamanho de página padrão para as requisições da API
 const PAGE_SIZE = 15;
@@ -14,30 +16,57 @@ const PAGE_SIZE = 15;
 const PAGINATION_THRESHOLD = 5;
 
 /**
+ * Tipo que define o objeto de retorno do hook useOfertaSwipe.
+ */
+export type UseOfertaSwipeReturn = {
+    /** Lista de ofertas carregadas no momento */
+    ofertas: OfertaServico[];
+    /** Indica se é o carregamento inicial dos dados */
+    isInitialLoading: boolean;
+    /** Indica se está carregando uma nova página de dados */
+    isPaging: boolean;
+    /** Indica se uma atualização manual (refresh) está em curso */
+    isRefreshing: boolean;
+    /** Mensagem de erro amigável ao usuário, se houver */
+    error: string | null;
+    /** Indica se a lista está vazia, usado para mostrar telas de Empty State */
+    isEmpty: boolean;
+    /** Indica se há mais páginas a serem carregadas no servidor */
+    hasMore: boolean;
+    /** Índice da oferta que está no topo do deck */
+    currentIndex: number;
+    /** Contador incremental para forçar o reinício do componente de Swiper */
+    resetCount: number;
+    /** Referência para acessar métodos imperativos da biblioteca de Swiper */
+    swiperRef: RefObject<SwiperCardRefType | null>;
+    /** Callback para processar o swipe para a direita (Interesse) */
+    handleSwipeRight: (index: number) => Promise<void>;
+    /** Callback para processar o swipe para a esquerda (Desinteresse) */
+    handleSwipeLeft: (index: number) => Promise<void>;
+    /** Callback para processar o swipe para cima (Pular/Skip) */
+    handleSwipeTop: (index: number) => void;
+    /** Callback disparado quando todas as cartas do deck atual acabam */
+    handleSwipedAll: () => void;
+    /** Função para reverter o último swipe e restaurar a carta anterior */
+    handleUndo: () => void;
+    /** Função para recarregar as ofertas desde a primeira página */
+    handleRefresh: () => Promise<void>;
+    /** Função para repetir a última requisição que falhou */
+    handleRetry: () => void;
+    /** Setter para atualizar manualmente o índice da carta atual */
+    setCurrentIndex: Dispatch<SetStateAction<number>>;
+    /** Setter para definir ou limpar mensagens de erro na UI */
+    setError: Dispatch<SetStateAction<string | null>>;
+};
+
+/**
  * Hook customizado para gerenciar o estado e a lógica de negócio da funcionalidade de swipe de ofertas.
  * Este hook centraliza o carregamento de dados, controle de paginação, manipulação de interações
  * (like/dislike) e o estado do deck de cartas.
  *
- * @returns {Object} Um objeto contendo:
- * - ofertas: Lista de ofertas atuais.
- * - isInitialLoading: Verdadeiro se estiver no primeiro carregamento.
- * - isPaging: Verdadeiro se estiver carregando mais itens (paginação).
- * - isRefreshing: Verdadeiro se estiver atualizando a lista (refresh).
- * - error: Mensagem de erro, se houver.
- * - isEmpty: Verdadeiro se não houver ofertas para exibir.
- * - currentIndex: Índice da carta atual no topo do deck.
- * - hasMore: Verdadeiro se houver mais páginas a carregar.
- * - swiperRef: Referência para controlar o componente Swiper.
- * - handleSwipeRight: Função para lidar com o Like.
- * - handleSwipeLeft: Função para lidar com o Dislike.
- * - handleSwipedAll: Função disparada quando todas as cartas são consumidas.
- * - handleUndo: Função para desfazer o último movimento.
- * - handleRefresh: Função para recarregar a lista do zero.
- * - handleRetry: Função para tentar carregar novamente após um erro.
- * - setCurrentIndex: Setter para o índice atual.
- * - setError: Setter para o estado de erro.
+ * @returns {UseOfertaSwipeReturn} Um objeto contendo o estado e as funções de controle do swipe.
  */
-export const useOfertaSwipe = () => {
+export const useOfertaSwipe = (): UseOfertaSwipeReturn => {
     // Estado que armazena a lista de ofertas carregadas
     const [ofertas, setOfertas] = useState<OfertaServico[]>([]);
     // Controle de loading para o estado inicial da tela
@@ -58,7 +87,7 @@ export const useOfertaSwipe = () => {
     const [resetCount, setResetCount] = useState(0);
 
     // Referência para acessar métodos imperativos do Swiper (ex: swipeBack)
-    const swiperRef = useRef<SwiperCardRefType>(null);
+    const swiperRef = useRef<SwiperCardRefType | null>(null);
     // Referência para rastrear a última página carregada, evitando stale closure na paginação
     const latestPageRef = useRef(1);
     // Referência para o timer de debounce, evitando chamadas repetitivas de paginação
@@ -238,11 +267,11 @@ export const useOfertaSwipe = () => {
                 // Isso garante que as imagens estejam prontas mesmo antes dos cards
                 // serem montados pelo Swiper.
                 imageUrls.forEach((url) => {
-                    try {
-                        Image.prefetch(url);
-                    } catch (e) {
+                    // Utiliza void para marcar explicitamente que não estamos aguardando a promise (fire-and-forget),
+                    // mas tratamos o erro caso ocorra com .catch() ao invés de try/catch síncrono.
+                    void Image.prefetch(url).catch((e) => {
                         if (__DEV__) console.warn('Erro ao fazer prefetch de imagem:', url, e);
-                    }
+                    });
                 });
             }
         };
@@ -321,6 +350,26 @@ export const useOfertaSwipe = () => {
     );
 
     /**
+     * Manipula a ação de swipe para cima (Skip/Pular).
+     * Apenas avança o índice sem registrar interação no servidor.
+     *
+     * @param {number} index - O índice da oferta que sofreu o swipe.
+     */
+    const handleSwipeTop = useCallback(
+        (index: number) => {
+            // Feedback tátil leve
+            vibrateLight();
+
+            // Diferente do Like/Dislike, aqui não chamamos o interactionService.
+            // Apenas garantimos que a paginação ocorra se necessário.
+            if (index >= ofertas.length - PAGINATION_THRESHOLD) {
+                scheduleNextPage();
+            }
+        },
+        [ofertas.length, scheduleNextPage]
+    );
+
+    /**
      * Função disparada pelo componente Swiper quando todas as cartas carregadas no deck são removidas.
      * Decide se deve carregar a próxima página ou mostrar o estado de lista vazia.
      */
@@ -349,17 +398,27 @@ export const useOfertaSwipe = () => {
         if (!swiper || ofertas.length === 0) return;
 
         try {
-            // Não permite voltar antes da primeira carta
-            if (currentIndex <= 0) return;
+            // Executa a animação de voltar carta
+            // Na Web, um pequeno delay via setTimeout garante que o swipeBack
+            // ocorra de forma assíncrona, resolvendo conflitos de eventos.
+            if (Platform.OS === 'web') {
+                setTimeout(() => {
+                    swiper.swipeBack();
+                }, 50);
+            } else {
+                swiper.swipeBack();
+            }
 
-            // Chama o método nativo do Swiper para voltar a carta
-            swiper.swipeBack();
             vibrateLight();
-        } catch (err) {
-            if (__DEV__) console.error(err);
-        }
-    }, [ofertas.length, currentIndex]);
 
+            // Atualiza o estado local
+            setCurrentIndex(prev => Math.max(0, prev - 1));
+        } catch (err) {
+            if (__DEV__) console.warn('Aviso ao desfazer swipe:', err);
+            // Em caso de erro, garantimos que pelo menos o estado tente sincronizar
+            setCurrentIndex(prev => Math.max(0, prev - 1));
+        }
+    }, [ofertas.length, setCurrentIndex]);
     /**
      * Reinicia o estado do hook e recarrega as ofertas da primeira página.
      * Usado para ações de Pull-to-Refresh.
@@ -395,10 +454,12 @@ export const useOfertaSwipe = () => {
         swiperRef,
         handleSwipeRight,
         handleSwipeLeft,
+        handleSwipeTop,
         handleSwipedAll,
         handleUndo,
         handleRefresh,
         handleRetry,
+        hasMore,
         setCurrentIndex,
         setError,
     };

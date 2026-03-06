@@ -3,11 +3,31 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { uploadService } from '../services/uploadService';
 import { logger } from '../utils/logger';
-import User from '../models/User';
+import User, { IUser } from '../models/User';
 import type { AuthRequest } from '../middleware/auth';
 import { updateNameSchema, updatePhoneSchema, updateLocationSchema, updateEmailSchema, updateDocumentsSchema, updateCompanyDataSchema } from '../validation/userValidation';
 import { validate } from '../middleware/validation';
 import { emailService } from '../services/emailService';
+
+const findUserAndValidatePassword = async (
+  userId: string,
+  currentPassword: string,
+  res: Response
+): Promise<IUser | null> => {
+  const user = await User.findById(userId).select('+senha');
+  if (!user) {
+    res.status(404).json({ success: false, message: 'Usuário não encontrado' });
+    return null;
+  }
+
+  const passwordOk = await bcrypt.compare(currentPassword, user.senha);
+  if (!passwordOk) {
+    res.status(400).json({ success: false, message: 'Senha atual incorreta.' });
+    return null;
+  }
+
+  return user;
+};
 
 /**
  * Controller responsável por gerenciar as operações relacionadas ao perfil do usuário.
@@ -139,15 +159,9 @@ export const userController = {
         const userId = req.user!.id;
         const { email, currentPassword } = req.body as { email: string; currentPassword: string };
 
-        const user = await User.findById(userId).select('+senha');
+        const user = await findUserAndValidatePassword(userId, currentPassword, res);
         if (!user) {
-          return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
-        }
-
-        // Verifica se a senha confere
-        const passwordOk = await bcrypt.compare(currentPassword, user.senha);
-        if (!passwordOk) {
-          return res.status(400).json({ success: false, message: 'Senha atual incorreta.' });
+          return;
         }
 
         // Verifica se o e-mail é o mesmo do atual
@@ -398,14 +412,9 @@ export const userController = {
         return res.status(400).json({ success: false, message: 'Nova senha deve ter no mínimo 6 caracteres.' });
       }
 
-      const user = await User.findById(userId).select('+senha');
+      const user = await findUserAndValidatePassword(userId, currentPassword, res);
       if (!user) {
-        return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
-      }
-
-      const passwordOk = await bcrypt.compare(currentPassword, user.senha);
-      if (!passwordOk) {
-        return res.status(400).json({ success: false, message: 'Senha atual incorreta.' });
+        return;
       }
 
       user.senha = newPassword;

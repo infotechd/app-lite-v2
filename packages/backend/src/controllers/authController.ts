@@ -431,11 +431,9 @@ export const resetPassword = async (req: AuthRequest, res: Response): Promise<vo
         };
 
         if (isSixDigits) {
-            const codeHash = crypto.createHash('sha256').update(tokenOrCode).digest('hex');
-            query.resetPasswordCode = codeHash;
+            query.resetPasswordCode = crypto.createHash('sha256').update(tokenOrCode).digest('hex');
         } else {
-            const tokenHash = crypto.createHash('sha256').update(tokenOrCode).digest('hex');
-            query.resetPasswordToken = tokenHash;
+            query.resetPasswordToken = crypto.createHash('sha256').update(tokenOrCode).digest('hex');
         }
 
         const user = await User.findOne(query).select('+senha');
@@ -555,10 +553,11 @@ export const resetPasswordDeepLink = (req: Request, res: Response): void => {
 
   <script nonce="${nonce}">
     (function() {
-      var schemeUrl = '${schemeUrl}';
-      var androidIntent = '${androidIntent}';
-      var isAndroid = /Android/i.test(navigator.userAgent);
-      var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const userAgent = navigator.userAgent || '';
+      const schemeUrl = '${schemeUrl}';
+      const androidIntent = '${androidIntent}';
+      const isAndroid = /Android/i.test(userAgent);
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
       
       function tryOpen() {
         // Tenta abrir o app automaticamente apenas se for mobile
