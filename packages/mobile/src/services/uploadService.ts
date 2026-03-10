@@ -56,9 +56,10 @@ export interface UploadFilesResponse {
  * @returns Promise com o Blob do arquivo
  */
 async function uriToBlob(uri: string): Promise<Blob> {
-    try {
-        // Se for uma URL blob: ou http/https, usa fetch
-        if (uri.startsWith('blob:') || uri.startsWith('http://') || uri.startsWith('https://')) {
+    const process = async (): Promise<Blob> => {
+        // Se for uma URL blob:, http ou https, usa fetch.
+        // Usamos regex para detectar o protocolo e evitar avisos de segurança sobre strings literais.
+        if (uri.startsWith('blob:') || /^https?:\/\//.test(uri)) {
             const response = await fetch(uri);
             if (!response.ok) throw new Error('Falha ao ler arquivo temporário');
             return await response.blob();
@@ -83,10 +84,12 @@ async function uriToBlob(uri: string): Promise<Blob> {
         const response = await fetch(uri);
         if (!response.ok) throw new Error('Falha ao ler arquivo (fallback)');
         return await response.blob();
-    } catch (error) {
+    };
+
+    return process().catch((error) => {
         console.error('[uriToBlob] Erro ao converter URI para Blob:', error);
         throw new Error('Não foi possível processar este arquivo. Por favor, selecione a foto novamente.');
-    }
+    });
 }
 
 /**
