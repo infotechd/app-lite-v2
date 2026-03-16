@@ -120,13 +120,21 @@ export const OfferDetails: React.FC<OfferDetailsProps> = ({
                     </View>
                 </Pressable>
 
-                <View style={styles.priceContainer} accessibilityLabel={`${strings.ACCESSIBILITY.PRICE_PREFIX} ${formattedPrice} por ${unidadePreco}`} accessibilityRole="text">
-                    <Text variant="titleLarge" style={styles.price} numberOfLines={1} ellipsizeMode="tail">
-                        {formattedPrice}
-                    </Text>
-                    <Text variant="labelSmall" style={styles.priceUnit} numberOfLines={1} ellipsizeMode="tail">
-                        /{unidadePreco}
-                    </Text>
+                <View style={styles.priceContainer} accessibilityLabel={item.unidadePreco === 'a_combinar' || item.unidadePreco === 'sob_consulta' ? (item.unidadePreco === 'a_combinar' ? 'Preço A combinar' : 'Preço Sob consulta') : `${strings.ACCESSIBILITY.PRICE_PREFIX} ${formattedPrice} por ${unidadePreco}`} accessibilityRole="text">
+                    {item.unidadePreco === 'a_combinar' || item.unidadePreco === 'sob_consulta' ? (
+                        <Text variant="titleMedium" style={styles.price} numberOfLines={1} ellipsizeMode="tail">
+                            {item.unidadePreco === 'a_combinar' ? 'A combinar' : 'Sob consulta'}
+                        </Text>
+                    ) : (
+                        <>
+                            <Text variant="titleLarge" style={styles.price} numberOfLines={1} ellipsizeMode="tail">
+                                {formattedPrice}
+                            </Text>
+                            <Text variant="labelSmall" style={styles.priceUnit} numberOfLines={1} ellipsizeMode="tail">
+                                /{unidadePreco}
+                            </Text>
+                        </>
+                    )}
                 </View>
             </View>
         </Pressable>

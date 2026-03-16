@@ -31,8 +31,24 @@ describe('criarOfertaSchema - preço e unidade do preço', () => {
     }
   });
 
-  it('falha quando precoText não tem dígitos', () => {
-    const res = criarOfertaSchema.safeParse(makeValidData({ precoText: '' }));
+  it('valida com sucesso quando unidade é a_combinar mesmo com preço vazio ou zero', () => {
+    const res1 = criarOfertaSchema.safeParse(makeValidData({ priceUnit: 'a_combinar', precoText: '' }));
+    expect(res1.success).toBe(true);
+    
+    const res2 = criarOfertaSchema.safeParse(makeValidData({ priceUnit: 'a_combinar', precoText: 'R$ 0,00' }));
+    expect(res2.success).toBe(true);
+  });
+
+  it('valida com sucesso quando unidade é sob_consulta mesmo com preço vazio ou zero', () => {
+    const res1 = criarOfertaSchema.safeParse(makeValidData({ priceUnit: 'sob_consulta', precoText: '' }));
+    expect(res1.success).toBe(true);
+    
+    const res2 = criarOfertaSchema.safeParse(makeValidData({ priceUnit: 'sob_consulta', precoText: 'R$ 0,00' }));
+    expect(res2.success).toBe(true);
+  });
+
+  it('falha quando precoText não tem dígitos para unidades normais', () => {
+    const res = criarOfertaSchema.safeParse(makeValidData({ priceUnit: 'hora', precoText: '' }));
     expect(res.success).toBe(false);
     if (!res.success) {
       const issues = res.error.issues;
@@ -40,8 +56,8 @@ describe('criarOfertaSchema - preço e unidade do preço', () => {
     }
   });
 
-  it('falha quando precoText representa 0,00', () => {
-    const res = criarOfertaSchema.safeParse(makeValidData({ precoText: 'R$ 0,00' }));
+  it('falha quando precoText representa 0,00 para unidades normais', () => {
+    const res = criarOfertaSchema.safeParse(makeValidData({ priceUnit: 'hora', precoText: 'R$ 0,00' }));
     expect(res.success).toBe(false);
     if (!res.success) {
       const precoIssues = res.error.issues.filter((i) => i.path.join('.') === 'precoText');

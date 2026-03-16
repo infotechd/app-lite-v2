@@ -98,11 +98,52 @@ const mediaFileSchema = z.object({
  * Conjunto de unidades de preço suportadas em ofertas.
  * Ex.: por hora, diária, mês, aula ou pacote.
  */
-export const PRICE_UNITS = ['hora','diaria','mes','aula','pacote'] as const;
+export const PRICE_UNITS = ['hora','diaria','mes','aula','pacote', 'a_combinar', 'sob_consulta'] as const;
 /**
  * Tipo união derivado de PRICE_UNITS. Útil para tipar seletores/inputs de unidade.
  */
 export type PriceUnit = typeof PRICE_UNITS[number];
+
+/**
+ * Interface base com os campos comuns entre CriarOfertaForm e EditForm,
+ * usada para centralizar a lógica de habilitação do botão de envio.
+ */
+export interface OfertaFormBase {
+    titulo: string;
+    descricao: string;
+    precoText: string;
+    priceUnit: PriceUnit;
+    categoria: string;
+    cidade: string;
+    estado: string;
+}
+
+/**
+ * Verifica se o formulário de oferta possui os dados mínimos para habilitar o envio.
+ *
+ * Essa validação é mais relaxada que o schema Zod (`criarOfertaSchema`):
+ * habilita o botão assim que o usuário começa a preencher, enquanto a validação
+ * completa (Zod) roda apenas no momento do submit.
+ *
+ * @param form  Campos base do formulário de oferta.
+ * @param submitting  Se o formulário já está sendo enviado.
+ * @returns `true` quando o botão de envio deve ficar habilitado.
+ */
+export function canSubmitOferta(form: OfertaFormBase, submitting: boolean): boolean {
+    const isSpecialUnit = form.priceUnit === 'a_combinar' || form.priceUnit === 'sob_consulta';
+    const price = parseCurrencyBRLToNumber(form.precoText);
+
+    return (
+        form.titulo.trim().length > 0 &&
+        form.descricao.trim().length > 0 &&
+        (isSpecialUnit || price > 0) &&
+        form.categoria.trim().length > 0 &&
+        (form.estado === 'BR' || form.cidade.trim().length > 0) &&
+        form.estado.trim().length === 2 &&
+        !!form.priceUnit &&
+        !submitting
+    );
+}
 
 /**
  * Schema para criação/edição de Oferta.
@@ -128,10 +169,7 @@ export const criarOfertaSchema = z.object({
     titulo: z.string().min(3, 'Mínimo 3 caracteres').max(100, 'Máximo 100 caracteres'),
     descricao: z.string().min(10, 'Mínimo 10 caracteres').max(2000, 'Máximo 2000 caracteres'),
     precoText: z
-        .string()
-        .min(1, MESSAGES.VALIDATION.REQUIRED)
-        .refine((v) => /\d/.test(v), 'Preço inválido') // requer pelo menos um dígito
-        .refine((v) => parseCurrencyBRLToNumber(v) > 0, 'Preço deve ser maior que 0'), // converte para número e valida > 0
+        .string(),
     priceUnit: z.enum(PRICE_UNITS, { required_error: 'Selecione a unidade do preço' }),
     categoria: z.string().min(1, 'Selecione uma categoria'),
     subcategoria: z.string().optional(),
@@ -141,6 +179,32 @@ export const criarOfertaSchema = z.object({
         .array(mediaFileSchema)
         .max(OFERTA_MEDIA_CONFIG.MAX_FILES, `Máximo ${OFERTA_MEDIA_CONFIG.MAX_FILES} arquivos`) // limita a quantidade de arquivos anexados
         .default([]),
+}).superRefine((data, ctx) => {
+    // Validação condicional do preço
+    const isSpecialUnit = data.priceUnit === 'a_combinar' || data.priceUnit === 'sob_consulta';
+    
+    if (!isSpecialUnit) {
+        // Se não for especial, o preço é obrigatório e deve ser um número válido > 0
+        if (!data.precoText || data.precoText.trim().length === 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['precoText'],
+                message: MESSAGES.VALIDATION.REQUIRED
+            });
+        } else if (!/\d/.test(data.precoText)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['precoText'],
+                message: 'Preço inválido'
+            });
+        } else if (parseCurrencyBRLToNumber(data.precoText) <= 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['precoText'],
+                message: 'Preço deve ser maior que 0'
+            });
+        }
+    }
 }).refine((data) => {
     if (data.estado !== 'BR') {
         return data.cidade.trim().length > 0;

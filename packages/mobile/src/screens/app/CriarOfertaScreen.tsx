@@ -15,7 +15,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { showAlert } from '@/utils/alert';
 import { Button, Text, TextInput, HelperText, Chip } from 'react-native-paper';
 import { colors, spacing } from '@/styles/theme';
-import { criarOfertaSchema, CriarOfertaForm, OFERTA_MEDIA_CONFIG } from '@/utils/validation';
+import { criarOfertaSchema, CriarOfertaForm, OFERTA_MEDIA_CONFIG, canSubmitOferta } from '@/utils/validation';
 import { ofertaService } from '@/services/ofertaService';
 import { uploadFiles } from '@/services/uploadService';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -68,19 +68,7 @@ const CriarOfertaScreen: React.FC<Props> = ({ navigation }) => {
     const [previewMedia, setPreviewMedia] = useState<MediaFile | null>(null);
     const { categoryOptions, subcategoryOptions, stateOptions } = useOfertaOptions(form.categoria);
 
-    const canSubmit = useMemo(() => {
-        const price = parseCurrencyBRLToNumber(form.precoText);
-        return (
-            form.titulo.trim().length > 0 &&
-            form.descricao.trim().length > 0 &&
-            price > 0 &&
-            form.categoria.trim().length > 0 &&
-            (form.estado === 'BR' || form.cidade.trim().length > 0) &&
-            form.estado.trim().length === 2 &&
-            !!form.priceUnit &&
-            !submitting
-        );
-    }, [form, submitting]);
+    const canSubmit = useMemo(() => canSubmitOferta(form, submitting), [form, submitting]);
 
     const setField = (key: keyof CriarOfertaForm, value: any) => {
         setForm((prev) => ({ ...prev, [key]: value }));
@@ -227,7 +215,8 @@ const CriarOfertaScreen: React.FC<Props> = ({ navigation }) => {
             }
 
             // 3) Montagem do payload normalizado a partir do formulário
-            const preco = parseCurrencyBRLToNumber(form.precoText);
+            const isSpecialUnit = form.priceUnit === 'a_combinar' || form.priceUnit === 'sob_consulta';
+            const preco = isSpecialUnit ? 0 : parseCurrencyBRLToNumber(form.precoText);
             const payload: any = {
                 titulo: form.titulo.trim(),
                 descricao: form.descricao.trim(),
@@ -283,17 +272,19 @@ const CriarOfertaScreen: React.FC<Props> = ({ navigation }) => {
             {!!errors.descricao && <HelperText type="error">{errors.descricao}</HelperText>}
 
             <View style={styles.row}>
-                <TextInput
-                    label="Preço"
-                    value={form.precoText}
-                    onChangeText={(t) => setField('precoText', maskCurrencyInput(t))}
-                    style={[styles.input, styles.priceInput]}
-                    mode="outlined"
-                    keyboardType="numeric"
-                    error={!!errors.preco}
-                />
+                {!(form.priceUnit === 'a_combinar' || form.priceUnit === 'sob_consulta') && (
+                    <TextInput
+                        label="Preço"
+                        value={form.precoText}
+                        onChangeText={(t) => setField('precoText', maskCurrencyInput(t))}
+                        style={[styles.input, styles.priceInput]}
+                        mode="outlined"
+                        keyboardType="numeric"
+                        error={!!errors.precoText}
+                    />
+                )}
 
-                <View style={styles.priceUnitContainer}>
+                <View style={[styles.priceUnitContainer, (form.priceUnit === 'a_combinar' || form.priceUnit === 'sob_consulta') && { flex: 1, minWidth: '100%' }]}>
                     <Text style={styles.label}>Preço por</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}
                                 contentContainerStyle={{ columnGap: 8 }}>
@@ -303,6 +294,8 @@ const CriarOfertaScreen: React.FC<Props> = ({ navigation }) => {
                             { value: 'mes', label: 'Mês' },
                             { value: 'aula', label: 'Aula' },
                             { value: 'pacote', label: 'Pacote' },
+                            { value: 'a_combinar', label: 'A combinar' },
+                            { value: 'sob_consulta', label: 'Sob consulta' },
                         ].map((opt) => (
                             <Chip
                                 key={opt.value}

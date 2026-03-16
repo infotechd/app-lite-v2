@@ -131,7 +131,7 @@ const normalizeCategoria = (input: string | undefined) => {
 };
 
 // Create oferta
-const PRICE_UNITS = ['hora','diaria','mes','aula','pacote'] as const;
+const PRICE_UNITS = ['hora','diaria','mes','aula','pacote', 'a_combinar', 'sob_consulta'] as const;
 export const createOfertaSchema = z.object({
     body: z.object({
         titulo: z.string().min(3).max(100),

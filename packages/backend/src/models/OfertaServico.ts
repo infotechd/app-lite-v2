@@ -4,7 +4,7 @@ export interface IOfertaServico extends Document {
     titulo: string;
     descricao: string;
     preco: number;
-    unidadePreco: 'hora' | 'diaria' | 'mes' | 'aula' | 'pacote';
+    unidadePreco: 'hora' | 'diaria' | 'mes' | 'aula' | 'pacote' | 'a_combinar' | 'sob_consulta';
     categoria: string;
     subcategoria?: string;
     prestador: {
@@ -75,7 +75,7 @@ const OfertaServicoSchema = new Schema<IOfertaServico>({
 
     unidadePreco: {
         type: String,
-        enum: ['hora','diaria','mes','aula','pacote'],
+        enum: ['hora','diaria','mes','aula','pacote','a_combinar','sob_consulta'],
         default: 'pacote',
         required: true,
     },

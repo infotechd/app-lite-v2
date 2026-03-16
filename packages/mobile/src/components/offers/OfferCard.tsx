@@ -129,11 +129,14 @@ export const OfferCard = React.memo(({ item, onPress }: OfferCardProps) => {
         mes: '/mês',
         aula: '/aula',
         pacote: ' (pacote)',
+        a_combinar: ' (A combinar)',
+        sob_consulta: ' (Sob consulta)',
     } as const;
     
     // Montagem da string de preço final com unidade
     const unidadeLabel = item.unidadePreco ? unidadeMap[item.unidadePreco] : '';
-    const precoFmtWithUnit = `${formatCurrencyBRL(preco)}${unidadeLabel}`;
+    const isSpecialUnit = item.unidadePreco === 'a_combinar' || item.unidadePreco === 'sob_consulta';
+    const precoFmtWithUnit = isSpecialUnit ? unidadeLabel.trim() : `${formatCurrencyBRL(preco)}${unidadeLabel}`;
 
     // Obtém a URL absoluta da primeira imagem da oferta para o thumbnail
     const thumbnailUrl = useMemo(() => {
