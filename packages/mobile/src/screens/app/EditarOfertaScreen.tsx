@@ -8,7 +8,7 @@ import { View, ScrollView, StyleSheet } from 'react-native';
 import { showAlert } from '@/utils/alert';
 import { Button, Text, TextInput, HelperText, Chip } from 'react-native-paper';
 import { colors, spacing } from '@/styles/theme'; // Tokens de tema (cores, espaçamentos)
-import { criarOfertaSchema, OFERTA_MEDIA_CONFIG, PriceUnit } from '@/utils/validation'; // Schema de validação e configs de mídia
+import { criarOfertaSchema, OFERTA_MEDIA_CONFIG, PriceUnit, canSubmitOferta } from '@/utils/validation'; // Schema de validação e configs de mídia
 import { ofertaService } from '@/services/ofertaService'; // Serviço de ofertas (API)
 import { uploadFiles } from '@/services/uploadService'; // Serviço de upload (imagens/vídeos)
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -93,6 +93,8 @@ const EditarOfertaScreen: React.FC<Props> = ({ route, navigation }) => {
     // Flag de envio para desabilitar ações simultâneas e exibir loading
     const [submitting, setSubmitting] = useState(false);
 
+    const canSubmit = useMemo(() => canSubmitOferta(form, submitting), [form, submitting]);
+
     const { categoryOptions, subcategoryOptions, stateOptions } = useOfertaOptions(form.categoria);
     
     // Debug: verificar se a categoria está sendo carregada corretamente
@@ -151,20 +153,6 @@ const EditarOfertaScreen: React.FC<Props> = ({ route, navigation }) => {
         setPreviewMedia(mediaFile);
     };
 
-    // Regra para habilitar o botão de salvar
-    const canSubmit = useMemo(() => {
-        const price = parseCurrencyBRLToNumber(form.precoText);
-        return (
-            form.titulo.trim().length > 0 &&
-            form.descricao.trim().length > 0 &&
-            price > 0 && // Garante preço válido
-            !!form.priceUnit &&
-            form.categoria.trim().length > 0 &&
-            (form.estado === 'BR' || form.cidade.trim().length > 0) &&
-            form.estado.trim().length === 2 && // UF deve ter 2 caracteres
-            !submitting
-        );
-    }, [form, submitting]);
 
     /**
      * Atualiza um campo do formulário de forma imutável.
@@ -278,9 +266,11 @@ const EditarOfertaScreen: React.FC<Props> = ({ route, navigation }) => {
 
             // 3) Montagem do payload para API
             // Ponto de melhoria: evitar 'any' tipando o payload conforme contrato do backend.
+            const isSpecialUnit = form.priceUnit === 'a_combinar' || form.priceUnit === 'sob_consulta';
+            const preco = isSpecialUnit ? 0 : parseCurrencyBRLToNumber(form.precoText);
             const payload: any = {
                 ...form,
-                preco: parseCurrencyBRLToNumber(form.precoText),
+                preco,
                 unidadePreco: form.priceUnit,
                 localizacao: { cidade: form.cidade, estado: form.estado },
                 imagens: finalImages,
@@ -332,51 +322,74 @@ const EditarOfertaScreen: React.FC<Props> = ({ route, navigation }) => {
             {!!errors.descricao && <HelperText type="error">{errors.descricao}</HelperText>}
 
             {/* Campo: Preço (com máscara BRL) */}
-            <TextInput
-                label="Preço"
-                value={form.precoText}
-                onChangeText={t => setField('precoText', maskCurrencyInput(t))}
-                style={styles.input}
-                mode="outlined"
-                keyboardType="numeric"
-                error={!!errors.preco}
-            />
-            {!!errors.preco && <HelperText type="error">{errors.preco}</HelperText>}
+            {!(form.priceUnit === 'a_combinar' || form.priceUnit === 'sob_consulta') && (
+                <>
+                    <TextInput
+                        label="Preço"
+                        value={form.precoText}
+                        onChangeText={t => setField('precoText', maskCurrencyInput(t))}
+                        style={styles.input}
+                        mode="outlined"
+                        keyboardType="numeric"
+                        error={!!errors.preco}
+                    />
+                    {!!errors.preco && <HelperText type="error">{errors.preco}</HelperText>}
+                </>
+            )}
 
             {/* Unidade de preço */}
             <Text style={styles.label}>Preço por</Text>
-            <View style={styles.priceUnitContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.priceUnitContainer}>
                 <Chip
                     selected={form.priceUnit === 'hora'}
                     onPress={() => setField('priceUnit', 'hora')}
+                    style={styles.chip}
                 >
                     Hora
                 </Chip>
                 <Chip
                     selected={form.priceUnit === 'diaria'}
                     onPress={() => setField('priceUnit', 'diaria')}
+                    style={styles.chip}
                 >
                     Diária
                 </Chip>
                 <Chip
                     selected={form.priceUnit === 'mes'}
                     onPress={() => setField('priceUnit', 'mes')}
+                    style={styles.chip}
                 >
                     Mês
                 </Chip>
                 <Chip
                     selected={form.priceUnit === 'aula'}
                     onPress={() => setField('priceUnit', 'aula')}
+                    style={styles.chip}
                 >
                     Aula
                 </Chip>
                 <Chip
                     selected={form.priceUnit === 'pacote'}
                     onPress={() => setField('priceUnit', 'pacote')}
+                    style={styles.chip}
                 >
                     Pacote
                 </Chip>
-            </View>
+                <Chip
+                    selected={form.priceUnit === 'a_combinar'}
+                    onPress={() => setField('priceUnit', 'a_combinar')}
+                    style={styles.chip}
+                >
+                    A combinar
+                </Chip>
+                <Chip
+                    selected={form.priceUnit === 'sob_consulta'}
+                    onPress={() => setField('priceUnit', 'sob_consulta')}
+                    style={styles.chip}
+                >
+                    Sob consulta
+                </Chip>
+            </ScrollView>
 
             {/* Seleção de categoria e subcategoria */}
             <CategoryFields
@@ -482,9 +495,12 @@ const styles = StyleSheet.create({
     },
     priceUnitContainer: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: spacing.sm,
+        columnGap: 8,
         marginBottom: spacing.md,
+        paddingBottom: 4, // para não cortar a sombra se houver
+    },
+    chip: {
+        marginRight: 0, // usando gap ou padding no container
     },
     label: {
         marginBottom: spacing.sm,
