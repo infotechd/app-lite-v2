@@ -69,7 +69,7 @@ const SwipeOfertasScreen: React.FC = () => {
     // Configura as opções de navegação do cabeçalho com referência estável para evitar re-render desnecessário
     const headerRight = useCallback(
         () => (
-            <View style={styles.headerRight}>
+            <View style={styles.headerRight} testID="header-right-container">
                 <IconButton
                     icon="plus"
                     onPress={onPressCriarOferta}
