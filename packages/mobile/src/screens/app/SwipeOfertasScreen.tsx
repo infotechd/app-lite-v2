@@ -238,7 +238,7 @@ const SwipeOfertasScreen: React.FC = () => {
             >
                 {/* Botão para descartar a oferta (Swipe Left) */}
                 <IconButton
-                    icon="close"
+                    icon="thumb-down"
                     size={40}
                     iconColor={colors.error}
                     mode="outlined"
@@ -281,7 +281,7 @@ const SwipeOfertasScreen: React.FC = () => {
 
                 {/* Botão para curtir a oferta (Swipe Right) */}
                 <IconButton
-                    icon="heart"
+                    icon="thumb-up"
                     size={40}
                     iconColor={colors.success}
                     mode="outlined"
