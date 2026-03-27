@@ -39,7 +39,7 @@ const SwipeNopeOverlay: React.FC<SwipeNopeOverlayProps> = ({
         accessibilityLabel={OFFER_TRANSLATIONS.OVERLAYS.ACCESSIBILITY_NOPE}
     >
         {/* Ícone de fechar para indicar visualmente a rejeição */}
-        <Icon name="close" size={iconSize} color={colors.error} />
+        <Icon name="thumb-down" size={iconSize} color={colors.error} />
         {/* Texto em destaque para confirmar a intenção de "NÃO" */}
         <Text variant="headlineLarge" style={styles.text}>{label}</Text>
     </View>

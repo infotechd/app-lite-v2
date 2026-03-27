@@ -34,7 +34,7 @@ const SwipeLikeOverlay: React.FC<SwipeLikeOverlayProps> = ({
         accessibilityLabel={OFFER_TRANSLATIONS.OVERLAYS.ACCESSIBILITY_LIKE}
     >
         {/* Ícone de coração centralizado representando a ação de 'Like' */}
-        <Icon name="heart" size={iconSize} color={colors.success} />
+        <Icon name="thumb-up" size={iconSize} color={colors.success} />
         
         {/* Texto de feedback visual em destaque */}
         <Text variant="headlineLarge" style={styles.text}>{label}</Text>
